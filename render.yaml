@@ -1,0 +1,28 @@
+services:
+    - type: web
+      name: zeuspay-whatsapp-bot
+      runtime: node
+      region: frankfurt  # or oregon — pick closest to your users
+      plan: starter
+      buildCommand: npm install && npm run build
+      startCommand: npm start
+      healthCheckPath: /health
+      envVars:
+        - key: NODE_ENV
+          value: production
+        - key: PORT
+          value: 10000  # Render assigns 10000 by default
+        - key: PUBLIC_URL
+          sync: false    # fill in after first deploy
+        - key: ZEUSPAY_API_URL
+          sync: false
+        - key: REDIS_URL
+          sync: false
+        - key: ENCRYPTION_KEY
+          sync: false
+        - key: TWILIO_ACCOUNT_SID
+          sync: false
+        - key: TWILIO_AUTH_TOKEN
+          sync: false
+        - key: SERVICE_SECRET
+          sync: false

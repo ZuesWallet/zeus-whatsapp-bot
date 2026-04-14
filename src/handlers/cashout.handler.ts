@@ -42,7 +42,15 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
     let estimate: ZeusPayEstimate
     try {
       estimate = await zeuspay.getEstimate(asset, amount, config.partnerApiKey)
-    } catch {
+    } catch (err: any) {
+      console.error('[cashout] getEstimate failed', {
+        asset,
+        amount,
+        code: err?.code,
+        message: err?.message,
+        status: err?.response?.status,
+        data: err?.response?.data,
+      })
       return {
         reply: '⚠️ Could not get a rate estimate right now. Please try again shortly.',
         newSession: { flow: null, step: null, data: {} },

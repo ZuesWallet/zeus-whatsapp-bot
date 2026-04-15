@@ -6,6 +6,7 @@ export type WACommand =
   | 'HISTORY'
   | 'HELP'
   | 'ADD_BANK'
+  | 'SET_PIN'
 
 // Raw inbound message — normalised from Twilio's format
 export interface InboundMessage {
@@ -35,7 +36,7 @@ export interface PartnerConfig {
 
 // Redis session state
 export interface Session {
-  flow: 'CASHOUT' | 'ADD_BANK' | null
+  flow: 'CASHOUT' | 'ADD_BANK' | 'SET_PIN' | null
   step: string | null
   data: {
     asset?: string
@@ -51,6 +52,7 @@ export interface Session {
       cryptoAmount: string
     }
     transactionId?: string
+    pin?: string
   }
 }
 
@@ -62,6 +64,7 @@ export type Intent =
   | { type: 'HISTORY' }
   | { type: 'CASHOUT'; amount?: string; asset?: string }
   | { type: 'ADD_BANK' }
+  | { type: 'SET_PIN' }
   | { type: 'HELP' }
   | { type: 'CANCEL' }
   | { type: 'MENU_SELECT'; option: string }

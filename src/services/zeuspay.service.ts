@@ -99,34 +99,49 @@ export class ZeusPayService {
     })
   }
 
+  async setPin(phone: string, pin: string, apiKey: string): Promise<void> {
+    return this.withRetry(async () => {
+      await this.client(apiKey).post(
+        `/api/v1/partner/users/${encodeURIComponent(phone)}/pin/set`,
+        { pin }
+      )
+    })
+  }
+
+  async verifyPin(phone: string, pin: string, apiKey: string): Promise<string> {
+    return this.withRetry(async () => {
+      const res = await this.client(apiKey).post(
+        `/api/v1/partner/users/${encodeURIComponent(phone)}/pin/verify`,
+        { pin }
+      )
+      return (res.data.data as { pinToken: string }).pinToken
+    })
+  }
+
   async cashout(params: {
     phone: string
     asset: string
     cryptoAmount: string
+    pinToken: string
     bankCode: string
     accountNumber: string
     accountName: string
     apiKey: string
-    pin?: string
   }): Promise<ZeusPayTransaction> {
     return this.withRetry(async () => {
-      const headers: Record<string, string> = {}
-      if (params.pin) {
-        headers['X-Transaction-Pin'] = params.pin
-      }
       const res = await this.client(params.apiKey).post(
         '/api/v1/partner/cashout',
         {
           externalUserId: params.phone,
           asset: params.asset,
           cryptoAmount: params.cryptoAmount,
+          pinToken: params.pinToken,
           bankAccount: {
             bankCode: params.bankCode,
             accountNumber: params.accountNumber,
             accountName: params.accountName,
           },
-        },
-        { headers }
+        }
       )
       return res.data.data as ZeusPayTransaction
     })

@@ -84,6 +84,16 @@ export class IntentService {
       return { type: 'ADD_BANK' }
     }
 
+    // Set PIN
+    if (
+      t.includes('set pin') ||
+      t.includes('create pin') ||
+      t.includes('new pin') ||
+      t === 'pin'
+    ) {
+      return { type: 'SET_PIN' }
+    }
+
     // Cashout — also try to extract amount and asset
     if (
       t.includes('cash out') ||

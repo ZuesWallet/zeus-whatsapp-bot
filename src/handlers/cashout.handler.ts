@@ -202,23 +202,15 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
     }
 
     const { data } = session
-    let transaction: ZeusPayTransaction
 
+    // First verify the PIN — get a short-lived token, then use it for the cashout
+    let pinToken: string
     try {
-      transaction = await zeuspay.cashout({
-        phone: message.from,
-        asset: data.asset!,
-        cryptoAmount: data.estimate!.cryptoAmount,
-        bankCode: data.bankCode!,
-        accountNumber: data.accountNumber!,
-        accountName: data.accountName!,
-        apiKey: config.partnerApiKey,
-        pin: intent.pin,
-      })
+      pinToken = await zeuspay.verifyPin(message.from, intent.pin!, config.partnerApiKey)
     } catch (err: any) {
       if (err.code === 'WRONG_PIN') {
         const remaining = err.details?.attemptsRemaining
-        const hint = remaining ? `${remaining} attempt(s) remaining.` : 'Please try again.'
+        const hint = remaining !== undefined ? `${remaining} attempt(s) remaining.` : 'Please try again.'
         return {
           reply: `❌ Incorrect PIN. ${hint}\n\nEnter your PIN or type *cancel*.`,
           newSession: session,
@@ -226,10 +218,35 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
       }
       if (err.code === 'PIN_LOCKED') {
         return {
-          reply: '🔒 Your PIN has been locked. Please reset it in the GoGet app.',
+          reply: '🔒 Your PIN has been locked due to too many wrong attempts. Try again in 30 minutes.',
           newSession: { flow: null, step: null, data: {} },
         }
       }
+      if (err.code === 'PIN_NOT_SET') {
+        return {
+          reply: '⚠️ You haven\'t set a PIN yet. Type *set pin* to create one first.',
+          newSession: { flow: null, step: null, data: {} },
+        }
+      }
+      return {
+        reply: '⚠️ Could not verify PIN. Please try again.',
+        newSession: session,
+      }
+    }
+
+    let transaction: ZeusPayTransaction
+    try {
+      transaction = await zeuspay.cashout({
+        phone: message.from,
+        asset: data.asset!,
+        cryptoAmount: data.estimate!.cryptoAmount,
+        pinToken,
+        bankCode: data.bankCode!,
+        accountNumber: data.accountNumber!,
+        accountName: data.accountName!,
+        apiKey: config.partnerApiKey,
+      })
+    } catch (err: any) {
       if (err.code === 'INSUFFICIENT_BALANCE') {
         return {
           reply: '⚠️ Insufficient balance. Type *balance* to check your current balance.',

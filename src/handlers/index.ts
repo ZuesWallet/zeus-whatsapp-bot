@@ -7,6 +7,7 @@ import { walletHandler } from './wallet.handler'
 import { historyHandler } from './history.handler'
 import { cashoutHandler } from './cashout.handler'
 import { addBankHandler } from './addBank.handler'
+import { setPinHandler } from './setPin.handler'
 import type { InboundMessage, Session, PartnerConfig, HandlerOutput, WACommand } from '../types'
 
 const intentSvc = new IntentService()
@@ -28,6 +29,10 @@ export async function dispatch(
     return addBankHandler(input)
   }
 
+  if (session.flow === 'SET_PIN') {
+    return setPinHandler(input)
+  }
+
   // No active flow — check if command is enabled
   const commandToFeature: Record<string, WACommand> = {
     RATE:     'RATE',
@@ -36,6 +41,7 @@ export async function dispatch(
     CASHOUT:  'CASHOUT',
     HISTORY:  'HISTORY',
     ADD_BANK: 'ADD_BANK',
+    SET_PIN:  'SET_PIN',
     HELP:     'HELP',
   }
 
@@ -54,6 +60,7 @@ export async function dispatch(
     case 'HISTORY':     return historyHandler(input)
     case 'CASHOUT':     return cashoutHandler(input)
     case 'ADD_BANK':    return addBankHandler(input)
+    case 'SET_PIN':     return setPinHandler(input)
     case 'HELP':
     case 'MENU_SELECT': return helpHandler(input)
     case 'CANCEL':

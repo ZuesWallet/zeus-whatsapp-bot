@@ -7,6 +7,7 @@ const commandMap: Record<WACommand, string> = {
   CASHOUT:  '💸 *cash out [amount]* — Convert to naira',
   HISTORY:  '🕐 *history* — Your last 5 transactions',
   ADD_BANK: '🏦 *add bank* — Add a bank account',
+  SET_PIN:  '🔐 *set pin* — Set your transaction PIN',
   HELP:     '',
 }
 

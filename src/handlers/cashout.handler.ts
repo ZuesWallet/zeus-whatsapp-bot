@@ -91,13 +91,6 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
 
   // ── STEP: AWAITING_BANK ───────────────────────────────────────────────────
   if (session.step === 'AWAITING_BANK') {
-    if (intent.type !== 'MENU_SELECT') {
-      return {
-        reply: 'Please reply with a number to select your bank account.',
-        newSession: session,
-      }
-    }
-
     let bankAccounts: Awaited<ReturnType<typeof zeuspay.getBankAccounts>> = []
     try {
       bankAccounts = await zeuspay.getBankAccounts(message.from, config.partnerApiKey)
@@ -107,14 +100,36 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
 
     const addNewIndex = (Math.min(bankAccounts.length, 3) + 1).toString()
 
-    if (intent.option === addNewIndex || bankAccounts.length === 0) {
+    // User typed "add bank" explicitly, or selected the add-new option, or has no accounts
+    const wantsToAddBank =
+      intent.type === 'ADD_BANK' ||
+      (intent.type === 'MENU_SELECT' && intent.option === addNewIndex) ||
+      bankAccounts.length === 0
+
+    if (wantsToAddBank) {
+      // Fetch bank list and show it
+      let banks: { code: string; name: string }[] = []
+      try {
+        banks = await zeuspay.getBanks(config.partnerApiKey)
+      } catch {
+        return {
+          reply: '⚠️ Could not load bank list right now. Please try again.',
+          newSession: session,
+        }
+      }
+      let reply = '🏦 *Select your bank:*\n\n'
+      banks.forEach((b, i) => { reply += `${i + 1}. ${b.name}\n` })
+      reply += '\n_Reply with the number next to your bank._\n\nType *cancel* to abort.'
       return {
-        reply:
-          '🏦 Let\'s add a bank account.\n\n' +
-          'Reply with your *bank code* and *account number* separated by a space.\n\n' +
-          'Example: *044 0123456789*\n\n' +
-          'Type *cancel* to abort.',
+        reply,
         newSession: { ...session, step: 'AWAITING_NEW_BANK' },
+      }
+    }
+
+    if (intent.type !== 'MENU_SELECT') {
+      return {
+        reply: 'Please reply with a number to select your bank account.',
+        newSession: session,
       }
     }
 
@@ -152,20 +167,53 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
     }
   }
 
-  // ── STEP: AWAITING_NEW_BANK ───────────────────────────────────────────────
+  // ── STEP: AWAITING_NEW_BANK — user picks bank from numbered list ──────────
   if (session.step === 'AWAITING_NEW_BANK') {
-    const parts = message.body.trim().split(/\s+/)
-    if (parts.length !== 2 || !/^\d{3}$/.test(parts[0]) || !/^\d{10}$/.test(parts[1])) {
+    let banks: { code: string; name: string }[] = []
+    try {
+      banks = await zeuspay.getBanks(config.partnerApiKey)
+    } catch {
       return {
-        reply: 'Please send your bank code and account number.\n\nExample: *044 0123456789*',
+        reply: '⚠️ Could not load bank list. Please try again.',
         newSession: session,
       }
     }
 
-    const [bankCode, accountNumber] = parts
+    const num = parseInt(message.body.trim())
+    if (isNaN(num) || num < 1 || num > banks.length) {
+      return {
+        reply: `Please reply with a number between 1 and ${banks.length}.`,
+        newSession: session,
+      }
+    }
+
+    const selected = banks[num - 1]
+    return {
+      reply:
+        `✅ *${selected.name}* selected.\n\n` +
+        `Enter your *10-digit account number*:\n\n` +
+        `Type *cancel* to abort.`,
+      newSession: {
+        ...session,
+        step: 'AWAITING_NEW_BANK_ACCT',
+        data: { ...session.data, bankCode: selected.code, bankName: selected.name },
+      },
+    }
+  }
+
+  // ── STEP: AWAITING_NEW_BANK_ACCT — user enters account number ─────────────
+  if (session.step === 'AWAITING_NEW_BANK_ACCT') {
+    const accountNumber = message.body.trim().replace(/\s+/g, '')
+    if (!/^\d{10}$/.test(accountNumber)) {
+      return {
+        reply: 'Account number must be exactly 10 digits. Try again or type *cancel*.',
+        newSession: session,
+      }
+    }
+
     let resolvedName: string
     try {
-      const resolved = await zeuspay.resolveBank(accountNumber, bankCode, config.partnerApiKey)
+      const resolved = await zeuspay.resolveBank(accountNumber, session.data.bankCode!, config.partnerApiKey)
       resolvedName = resolved.accountName
     } catch {
       return {
@@ -175,19 +223,18 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
     }
 
     const est = session.data.estimate!
-    const reply =
-      `✅ *Confirm Cashout*\n\n` +
-      `₦${parseFloat(est.ngnAmount).toLocaleString()} → ${resolvedName}\n` +
-      `Account: ••••${accountNumber.slice(-4)}\n\n` +
-      `Enter your *6-digit PIN* to confirm.\n` +
-      `Type *cancel* to abort.`
-
     return {
-      reply,
+      reply:
+        `✅ *Confirm Cashout*\n\n` +
+        `₦${parseFloat(est.ngnAmount).toLocaleString()} → ${resolvedName}\n` +
+        `Bank: ${session.data.bankName}\n` +
+        `Account: ••••${accountNumber.slice(-4)}\n\n` +
+        `Enter your *6-digit PIN* to confirm.\n` +
+        `Type *cancel* to abort.`,
       newSession: {
         ...session,
         step: 'AWAITING_PIN',
-        data: { ...session.data, bankCode, accountNumber, accountName: resolvedName },
+        data: { ...session.data, accountNumber, accountName: resolvedName },
       },
     }
   }

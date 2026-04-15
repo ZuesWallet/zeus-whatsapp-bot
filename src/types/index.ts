@@ -42,6 +42,7 @@ export interface Session {
     asset?: string
     amount?: string
     bankCode?: string
+    bankName?: string
     accountNumber?: string
     accountName?: string
     selectedBankAccountId?: string

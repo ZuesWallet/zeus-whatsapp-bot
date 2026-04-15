@@ -53,6 +53,8 @@ export interface Session {
     }
     transactionId?: string
     pin?: string
+    currentPin?: string
+    newPin?: string
   }
 }
 

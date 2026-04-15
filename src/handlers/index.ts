@@ -7,7 +7,7 @@ import { walletHandler } from './wallet.handler'
 import { historyHandler } from './history.handler'
 import { cashoutHandler } from './cashout.handler'
 import { addBankHandler } from './addBank.handler'
-import { setPinHandler } from './setPin.handler'
+import { setPinHandler, changePinHandler, forgotPinHandler } from './setPin.handler'
 import type { InboundMessage, Session, PartnerConfig, HandlerOutput, WACommand } from '../types'
 
 const intentSvc = new IntentService()
@@ -33,6 +33,14 @@ export async function dispatch(
     return setPinHandler(input)
   }
 
+  if (session.flow === 'CHANGE_PIN') {
+    return changePinHandler(input)
+  }
+
+  if (session.flow === 'FORGOT_PIN') {
+    return forgotPinHandler(input)
+  }
+
   // No active flow — check if command is enabled
   const commandToFeature: Record<string, WACommand> = {
     RATE:     'RATE',
@@ -41,12 +49,15 @@ export async function dispatch(
     CASHOUT:  'CASHOUT',
     HISTORY:  'HISTORY',
     ADD_BANK: 'ADD_BANK',
-    SET_PIN:  'SET_PIN',
-    HELP:     'HELP',
+    SET_PIN:    'SET_PIN',
+    CHANGE_PIN: 'SET_PIN',  // same feature gate as SET_PIN
+    FORGOT_PIN: 'SET_PIN',
+    HELP:       'HELP',
   }
 
   const requiredFeature = commandToFeature[intent.type]
-  if (requiredFeature && requiredFeature !== 'HELP' && !config.enabledCommands.includes(requiredFeature)) {
+  const alwaysAvailable: WACommand[] = ['HELP', 'SET_PIN']
+  if (requiredFeature && !alwaysAvailable.includes(requiredFeature) && !config.enabledCommands.includes(requiredFeature)) {
     return {
       reply: `That command is not available. Type *help* to see what's available.`,
       newSession: session,
@@ -61,6 +72,8 @@ export async function dispatch(
     case 'CASHOUT':     return cashoutHandler(input)
     case 'ADD_BANK':    return addBankHandler(input)
     case 'SET_PIN':     return setPinHandler(input)
+    case 'CHANGE_PIN':  return changePinHandler(input)
+    case 'FORGOT_PIN':  return forgotPinHandler(input)
     case 'HELP':
     case 'MENU_SELECT': return helpHandler(input)
     case 'CANCEL':

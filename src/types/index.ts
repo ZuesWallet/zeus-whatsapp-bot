@@ -36,7 +36,7 @@ export interface PartnerConfig {
 
 // Redis session state
 export interface Session {
-  flow: 'CASHOUT' | 'ADD_BANK' | 'SET_PIN' | null
+  flow: 'CASHOUT' | 'ADD_BANK' | 'SET_PIN' | 'CHANGE_PIN' | 'FORGOT_PIN' | null
   step: string | null
   data: {
     asset?: string
@@ -65,6 +65,8 @@ export type Intent =
   | { type: 'CASHOUT'; amount?: string; asset?: string }
   | { type: 'ADD_BANK' }
   | { type: 'SET_PIN' }
+  | { type: 'CHANGE_PIN' }
+  | { type: 'FORGOT_PIN' }
   | { type: 'HELP' }
   | { type: 'CANCEL' }
   | { type: 'MENU_SELECT'; option: string }

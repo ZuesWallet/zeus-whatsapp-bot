@@ -108,6 +108,24 @@ export class ZeusPayService {
     })
   }
 
+  async changePin(phone: string, currentPin: string, newPin: string, apiKey: string): Promise<void> {
+    return this.withRetry(async () => {
+      await this.client(apiKey).post(
+        `/api/v1/partner/users/${encodeURIComponent(phone)}/pin/change`,
+        { currentPin, newPin }
+      )
+    })
+  }
+
+  async resetPin(phone: string, newPin: string, apiKey: string): Promise<void> {
+    return this.withRetry(async () => {
+      await this.client(apiKey).post(
+        `/api/v1/partner/users/${encodeURIComponent(phone)}/pin/reset`,
+        { newPin }
+      )
+    })
+  }
+
   async verifyPin(phone: string, pin: string, apiKey: string): Promise<string> {
     return this.withRetry(async () => {
       const res = await this.client(apiKey).post(

@@ -84,7 +84,27 @@ export class IntentService {
       return { type: 'ADD_BANK' }
     }
 
-    // Set PIN
+    // Forgot PIN / reset PIN
+    if (
+      t.includes('forgot pin') ||
+      t.includes('forget pin') ||
+      t.includes('reset pin') ||
+      t.includes('lost pin') ||
+      t.includes('recover pin')
+    ) {
+      return { type: 'FORGOT_PIN' }
+    }
+
+    // Change PIN (knows current PIN)
+    if (
+      t.includes('change pin') ||
+      t.includes('update pin') ||
+      t.includes('change my pin')
+    ) {
+      return { type: 'CHANGE_PIN' }
+    }
+
+    // Set PIN (first time)
     if (
       t.includes('set pin') ||
       t.includes('create pin') ||

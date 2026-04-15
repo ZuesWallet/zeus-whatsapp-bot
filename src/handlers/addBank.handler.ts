@@ -5,14 +5,14 @@ import type { HandlerInput, HandlerOutput } from '../types'
 const zeuspay = new ZeusPayService()
 const intentSvc = new IntentService()
 
-async function buildBankListReply(apiKey: string): Promise<{ reply: string; banks: { code: string; name: string }[] }> {
+async function buildBankListReply(apiKey: string): Promise<string> {
   const banks = await zeuspay.getBanks(apiKey)
   let reply = '🏦 *Add Bank Account*\n\nSelect your bank:\n\n'
   banks.forEach((b, i) => {
     reply += `${i + 1}. ${b.name}\n`
   })
   reply += '\n_Reply with the number next to your bank._\n\nType *cancel* to abort.'
-  return { reply, banks }
+  return reply
 }
 
 export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput> {
@@ -29,13 +29,13 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
   // ── Entry: fetch bank list and show it ────────────────────────────────────
   if (!session.step) {
     try {
-      const { reply, banks } = await buildBankListReply(config.partnerApiKey)
+      const reply = await buildBankListReply(config.partnerApiKey)
       return {
         reply,
         newSession: {
           flow: 'ADD_BANK',
           step: 'AWAITING_BANK_SELECT',
-          data: { banks: banks as any },
+          data: {},
         },
       }
     } catch {

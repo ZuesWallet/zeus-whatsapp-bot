@@ -5,14 +5,20 @@ import type { HandlerInput, HandlerOutput } from '../types'
 const zeuspay = new ZeusPayService()
 const intentSvc = new IntentService()
 
-async function buildBankListReply(apiKey: string): Promise<string> {
-  const banks = await zeuspay.getBanks(apiKey)
-  let reply = '🏦 *Add Bank Account*\n\nSelect your bank:\n\n'
-  banks.forEach((b, i) => {
-    reply += `${i + 1}. ${b.name}\n`
+/** Case-insensitive substring match, normalised to strip punctuation. */
+function normaliseName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function matchBanks(
+  query: string,
+  banks: { code: string; name: string }[]
+): { code: string; name: string }[] {
+  const q = normaliseName(query)
+  return banks.filter((b) => {
+    const n = normaliseName(b.name)
+    return n.includes(q) || q.includes(n)
   })
-  reply += '\n_Reply with the number next to your bank._\n\nType *cancel* to abort.'
-  return reply
 }
 
 export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput> {
@@ -26,57 +32,132 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
     }
   }
 
-  // ── Entry: fetch bank list and show it ────────────────────────────────────
+  // ── Entry: ask for bank name ──────────────────────────────────────────────
   if (!session.step) {
-    try {
-      const reply = await buildBankListReply(config.partnerApiKey)
-      return {
-        reply,
-        newSession: {
-          flow: 'ADD_BANK',
-          step: 'AWAITING_BANK_SELECT',
-          data: {},
-        },
-      }
-    } catch {
-      return {
-        reply: '⚠️ Could not load bank list right now. Please try again.',
-        newSession: { flow: null, step: null, data: {} },
-      }
+    return {
+      reply:
+        '🏦 *Add Bank Account*\n\n' +
+        'What is the name of your bank?\n\n' +
+        '_e.g. GTBank, Access Bank, Zenith, UBA_\n\n' +
+        'Type *cancel* to abort.',
+      newSession: {
+        flow: 'ADD_BANK',
+        step: 'AWAITING_BANK_NAME',
+        data: {},
+      },
     }
   }
 
-  // ── AWAITING_BANK_SELECT: user picks a number ─────────────────────────────
-  if (session.step === 'AWAITING_BANK_SELECT') {
-    // Re-fetch to get consistent list
+  // ── AWAITING_BANK_NAME: match user's typed name against bank list ──────────
+  if (session.step === 'AWAITING_BANK_NAME') {
     let banks: { code: string; name: string }[] = []
     try {
       banks = await zeuspay.getBanks(config.partnerApiKey)
     } catch {
       return {
-        reply: '⚠️ Could not load bank list. Please try again.',
+        reply: '⚠️ Could not verify banks right now. Please try again.',
         newSession: { flow: null, step: null, data: {} },
       }
     }
 
-    const num = parseInt(message.body.trim())
-    if (isNaN(num) || num < 1 || num > banks.length) {
+    const matches = matchBanks(message.body.trim(), banks)
+
+    if (matches.length === 0) {
       return {
-        reply: `Please reply with a number between 1 and ${banks.length}.`,
+        reply:
+          '❓ No bank found for *' + message.body.trim() + '*.\n\n' +
+          'Please try again with a different spelling, or type *cancel* to abort.',
         newSession: session,
       }
     }
 
-    const selected = banks[num - 1]
+    if (matches.length === 1) {
+      const bank = matches[0]
+      return {
+        reply:
+          `✅ *${bank.name}*\n\n` +
+          `Now enter your *10-digit account number*:\n\n` +
+          `Type *cancel* to abort.`,
+        newSession: {
+          flow: 'ADD_BANK',
+          step: 'AWAITING_ACCOUNT_NUMBER',
+          data: { bankCode: bank.code, bankName: bank.name },
+        },
+      }
+    }
+
+    // Multiple matches — show up to 3 and ask to pick
+    const shortList = matches.slice(0, 3)
+    let reply = `Found ${matches.length > 3 ? 'several' : matches.length} banks matching *${message.body.trim()}*:\n\n`
+    shortList.forEach((b, i) => {
+      reply += `${i + 1}. ${b.name}\n`
+    })
+    if (matches.length > 3) {
+      reply += '\nPlease be more specific, or reply with the number above.'
+    } else {
+      reply += '\nReply with the number, or type *cancel* to abort.'
+    }
+
+    return {
+      reply,
+      newSession: {
+        flow: 'ADD_BANK',
+        step: 'AWAITING_BANK_DISAMBIGUATE',
+        data: { shortList: shortList.map((b) => ({ code: b.code, name: b.name })) },
+      },
+    }
+  }
+
+  // ── AWAITING_BANK_DISAMBIGUATE: user picks from short list ────────────────
+  if (session.step === 'AWAITING_BANK_DISAMBIGUATE') {
+    const shortList = (session.data.shortList ?? []) as { code: string; name: string }[]
+    const num = parseInt(message.body.trim())
+
+    if (isNaN(num) || num < 1 || num > shortList.length) {
+      // Maybe they typed a new search term — go back to matching
+      let banks: { code: string; name: string }[] = []
+      try {
+        banks = await zeuspay.getBanks(config.partnerApiKey)
+      } catch {
+        return {
+          reply: '⚠️ Could not verify banks right now. Please try again.',
+          newSession: { flow: null, step: null, data: {} },
+        }
+      }
+
+      const matches = matchBanks(message.body.trim(), banks)
+
+      if (matches.length === 1) {
+        const bank = matches[0]
+        return {
+          reply:
+            `✅ *${bank.name}*\n\n` +
+            `Now enter your *10-digit account number*:\n\n` +
+            `Type *cancel* to abort.`,
+          newSession: {
+            flow: 'ADD_BANK',
+            step: 'AWAITING_ACCOUNT_NUMBER',
+            data: { bankCode: bank.code, bankName: bank.name },
+          },
+        }
+      }
+
+      return {
+        reply: `Please reply with a number (1–${shortList.length}), or type *cancel* to abort.`,
+        newSession: session,
+      }
+    }
+
+    const bank = shortList[num - 1]
     return {
       reply:
-        `✅ *${selected.name}* selected.\n\n` +
+        `✅ *${bank.name}*\n\n` +
         `Now enter your *10-digit account number*:\n\n` +
         `Type *cancel* to abort.`,
       newSession: {
         flow: 'ADD_BANK',
         step: 'AWAITING_ACCOUNT_NUMBER',
-        data: { bankCode: selected.code, bankName: selected.name },
+        data: { bankCode: bank.code, bankName: bank.name },
       },
     }
   }
@@ -97,7 +178,7 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
       accountName = resolved.accountName
     } catch {
       return {
-        reply: '⚠️ Could not verify that account number. Please check and try again, or type *cancel*.',
+        reply: '⚠️ Could not verify that account. Please check the number and try again, or type *cancel*.',
         newSession: session,
       }
     }
@@ -145,7 +226,7 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
       reply:
         `✅ *Bank account saved!*\n\n` +
         `${session.data.accountName} — ••••${session.data.accountNumber!.slice(-4)}\n\n` +
-        `You can now cash out to this account. Type *cash out [amount]* to start.`,
+        `You can now cash out. Type *cash out [amount]* to start.`,
       newSession: { flow: null, step: null, data: {} },
     }
   }

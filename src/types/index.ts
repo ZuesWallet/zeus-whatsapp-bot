@@ -53,6 +53,7 @@ export interface Session {
       cryptoAmount: string
     }
     transactionId?: string
+    shortList?: { code: string; name: string }[]
     pin?: string
     currentPin?: string
     newPin?: string

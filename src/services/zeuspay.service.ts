@@ -132,7 +132,7 @@ export class ZeusPayService {
         `/api/v1/partner/users/${encodeURIComponent(phone)}/pin/verify`,
         { pin }
       )
-      return (res.data.data as { pinToken: string }).pinToken
+      return (res.data as { pinToken: string }).pinToken
     })
   }
 

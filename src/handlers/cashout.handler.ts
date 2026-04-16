@@ -107,22 +107,13 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
       bankAccounts.length === 0
 
     if (wantsToAddBank) {
-      // Fetch bank list and show it
-      let banks: { code: string; name: string }[] = []
-      try {
-        banks = await zeuspay.getBanks(config.partnerApiKey)
-      } catch {
-        return {
-          reply: '⚠️ Could not load bank list right now. Please try again.',
-          newSession: session,
-        }
-      }
-      let reply = '🏦 *Select your bank:*\n\n'
-      banks.forEach((b, i) => { reply += `${i + 1}. ${b.name}\n` })
-      reply += '\n_Reply with the number next to your bank._\n\nType *cancel* to abort.'
       return {
-        reply,
-        newSession: { ...session, step: 'AWAITING_NEW_BANK' },
+        reply:
+          '🏦 *Add Bank Account*\n\n' +
+          'What is the name of your bank?\n\n' +
+          '_e.g. GTBank, Access Bank, Zenith, UBA_\n\n' +
+          'Type *cancel* to abort.',
+        newSession: { ...session, step: 'AWAITING_NEW_BANK_NAME' },
       }
     }
 
@@ -167,36 +158,88 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
     }
   }
 
-  // ── STEP: AWAITING_NEW_BANK — user picks bank from numbered list ──────────
-  if (session.step === 'AWAITING_NEW_BANK') {
+  // ── STEP: AWAITING_NEW_BANK_NAME — user types their bank name ────────────
+  if (session.step === 'AWAITING_NEW_BANK_NAME') {
     let banks: { code: string; name: string }[] = []
     try {
       banks = await zeuspay.getBanks(config.partnerApiKey)
     } catch {
       return {
-        reply: '⚠️ Could not load bank list. Please try again.',
+        reply: '⚠️ Could not verify banks right now. Please try again.',
         newSession: session,
       }
     }
 
-    const num = parseInt(message.body.trim())
-    if (isNaN(num) || num < 1 || num > banks.length) {
+    const query = message.body.trim()
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const q = norm(query)
+    const matches = banks.filter((b) => {
+      const n = norm(b.name)
+      return n.includes(q) || q.includes(n)
+    })
+
+    if (matches.length === 0) {
       return {
-        reply: `Please reply with a number between 1 and ${banks.length}.`,
+        reply:
+          `❓ No bank found for *${query}*.\n\n` +
+          `Please try again with a different spelling, or type *cancel* to abort.`,
         newSession: session,
       }
     }
 
-    const selected = banks[num - 1]
+    if (matches.length === 1) {
+      return {
+        reply:
+          `✅ *${matches[0].name}*\n\n` +
+          `Enter your *10-digit account number*:\n\n` +
+          `Type *cancel* to abort.`,
+        newSession: {
+          ...session,
+          step: 'AWAITING_NEW_BANK_ACCT',
+          data: { ...session.data, bankCode: matches[0].code, bankName: matches[0].name },
+        },
+      }
+    }
+
+    const shortList = matches.slice(0, 3)
+    let reply = `Found ${matches.length > 3 ? 'several' : matches.length} matches for *${query}*:\n\n`
+    shortList.forEach((b, i) => { reply += `${i + 1}. ${b.name}\n` })
+    reply += matches.length > 3
+      ? '\nPlease be more specific, or reply with a number above.'
+      : '\nReply with the number, or type *cancel*.'
+
+    return {
+      reply,
+      newSession: {
+        ...session,
+        step: 'AWAITING_NEW_BANK_DISAMBIGUATE',
+        data: { ...session.data, shortList: shortList.map((b) => ({ code: b.code, name: b.name })) },
+      },
+    }
+  }
+
+  // ── STEP: AWAITING_NEW_BANK_DISAMBIGUATE — pick from short list ───────────
+  if (session.step === 'AWAITING_NEW_BANK_DISAMBIGUATE') {
+    const shortList = (session.data.shortList ?? []) as { code: string; name: string }[]
+    const num = parseInt(message.body.trim())
+
+    if (isNaN(num) || num < 1 || num > shortList.length) {
+      return {
+        reply: `Please reply with a number (1–${shortList.length}), or type *cancel* to abort.`,
+        newSession: session,
+      }
+    }
+
+    const bank = shortList[num - 1]
     return {
       reply:
-        `✅ *${selected.name}* selected.\n\n` +
+        `✅ *${bank.name}*\n\n` +
         `Enter your *10-digit account number*:\n\n` +
         `Type *cancel* to abort.`,
       newSession: {
         ...session,
         step: 'AWAITING_NEW_BANK_ACCT',
-        data: { ...session.data, bankCode: selected.code, bankName: selected.name },
+        data: { ...session.data, bankCode: bank.code, bankName: bank.name },
       },
     }
   }

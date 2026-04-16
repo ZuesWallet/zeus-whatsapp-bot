@@ -1,10 +1,12 @@
 import { Router, Request, Response } from 'express'
 import { RoutingService } from '../services/routing.service'
 import { TwilioService } from '../services/twilio.service'
+import { SessionService } from '../services/session.service'
 
 const router = Router()
 const routing = new RoutingService()
 const twilioSvc = new TwilioService()
+const sessionSvc = new SessionService()
 
 // Template strings hardcoded for V1 — no DB lookup needed at runtime
 const TEMPLATES: Record<string, string> = {
@@ -98,6 +100,23 @@ router.post('/cache/invalidate', requireServiceSecret, async (req: Request, res:
     }
     await routing.invalidate(whatsappNumber)
     res.json({ success: true })
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+// DELETE /internal/session
+// Clears a stuck session for a specific user+partner combination.
+// Body: { phone: "+2348012345678", partnerId: "abc123" }
+router.delete('/session', requireServiceSecret, async (req: Request, res: Response) => {
+  try {
+    const { phone, partnerId } = req.body as { phone: string; partnerId: string }
+    if (!phone || !partnerId) {
+      res.status(400).json({ success: false, error: 'phone and partnerId required' })
+      return
+    }
+    await sessionSvc.clear(phone, partnerId)
+    res.json({ success: true, data: { cleared: true, phone, partnerId } })
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message })
   }

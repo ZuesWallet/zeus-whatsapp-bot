@@ -32,6 +32,22 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
     }
   }
 
+  // ── Legacy step: old AWAITING_BANK_SELECT — restart cleanly ──────────────
+  if (session.step === 'AWAITING_BANK_SELECT') {
+    return {
+      reply:
+        '🏦 *Add Bank Account*\n\n' +
+        'What is the name of your bank?\n\n' +
+        '_e.g. GTBank, Access Bank, Zenith, UBA_\n\n' +
+        'Type *cancel* to abort.',
+      newSession: {
+        flow: 'ADD_BANK',
+        step: 'AWAITING_BANK_NAME',
+        data: {},
+      },
+    }
+  }
+
   // ── Entry: ask for bank name ──────────────────────────────────────────────
   if (!session.step) {
     return {

@@ -37,7 +37,30 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
       }
     }
 
-    const asset = (intent.type === 'CASHOUT' && intent.asset) || 'USDT_ERC20'
+    // Determine asset: use explicit intent asset, otherwise find what the user
+    // actually has balance in (avoids INSUFFICIENT_BALANCE on wrong asset)
+    let asset = (intent.type === 'CASHOUT' && intent.asset) || ''
+    if (!asset) {
+      try {
+        const wallets = await zeuspay.getWallets(message.from, config.partnerApiKey)
+        const withBalance = wallets.filter((w) => parseFloat(w.balance) >= parseFloat(amount))
+        if (withBalance.length === 0) {
+          const best = wallets.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance))[0]
+          return {
+            reply:
+              `⚠️ Insufficient balance.\n\n` +
+              (best
+                ? `Your ${best.asset.replace('_ERC20','').replace('_TRC20','').replace('_BASE','')} balance is ${parseFloat(best.balance).toFixed(6)}.`
+                : `You have no funded wallets.`),
+            newSession: { flow: null, step: null, data: {} },
+          }
+        }
+        // Prefer stablecoins; take the one with most balance
+        asset = withBalance.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance))[0].asset
+      } catch {
+        asset = 'USDT_ERC20' // fallback if wallet fetch fails
+      }
+    }
 
     let estimate: ZeusPayEstimate
     try {
@@ -150,7 +173,7 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
         data: {
           ...session.data,
           selectedBankAccountId: selected.id,
-          bankCode: selected.bankName,
+          bankCode: selected.bankCode,
           accountNumber: selected.accountNumber,
           accountName: selected.accountName,
         },

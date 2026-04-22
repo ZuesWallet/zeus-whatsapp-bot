@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { RoutingService } from '../services/routing.service'
 import { SessionService } from '../services/session.service'
 import { TwilioService } from '../services/twilio.service'
+import { sendMessage } from '../services/sender.service'
 import { dispatch } from '../handlers'
 import { getRedisClient } from '../lib/redis'
 import type { InboundMessage } from '../types'
@@ -93,12 +94,7 @@ router.post('/', async (req: Request, res: Response) => {
 
       // 8. Send reply
       if (output.reply) {
-        await twilioSvc.send({
-          to: from,
-          from: to,
-          body: output.reply,
-          credentials: config.twilioCredentials,
-        })
+        await sendMessage(from, output.reply, config)
       }
     } catch (err) {
       console.error('[WhatsApp] Unhandled error processing message:', err)

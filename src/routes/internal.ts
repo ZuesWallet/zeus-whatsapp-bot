@@ -1,12 +1,11 @@
 import { Router, Request, Response } from 'express'
 import { RoutingService } from '../services/routing.service'
-import { TwilioService } from '../services/twilio.service'
 import { SessionService } from '../services/session.service'
+import { sendMessage, sendMessageWithImage } from '../services/sender.service'
 import { generateReceipt } from '../services/receipt.service'
 
 const router = Router()
 const routing = new RoutingService()
-const twilioSvc = new TwilioService()
 const sessionSvc = new SessionService()
 
 // Template strings hardcoded for V1 — no DB lookup needed at runtime
@@ -77,43 +76,24 @@ router.post('/notify', requireServiceSecret, async (req: Request, res: Response)
     const body = applyVariables(template, variables)
 
     const receiptData = (req.body as any).receiptData
-    const publicBotUrl = process.env.PUBLIC_BOT_URL
+    const publicBotUrl = process.env.PUBLIC_BOT_URL || ''
 
-    if (receiptData && publicBotUrl) {
+    if (receiptData) {
       try {
         const receiptBuffer = await generateReceipt({
           ...receiptData,
-          botName: (config as any).botName || 'GoGet',
+          botName: config.botName || 'GoGet',
         })
-        const filename = `receipt_${receiptData.transactionId}_${Date.now()}.png`
-        await twilioSvc.sendWithImage({
-          to: userPhone,
-          from: whatsappNumber,
-          body,
-          imageBuffer: receiptBuffer,
-          filename,
-          credentials: config.twilioCredentials,
-          publicBaseUrl: publicBotUrl,
-        })
+        await sendMessageWithImage(userPhone, body, receiptBuffer, config, publicBotUrl)
       } catch (receiptErr) {
         console.error('[Internal] Receipt generation failed, sending text only:', receiptErr)
-        await twilioSvc.send({
-          to: userPhone,
-          from: whatsappNumber,
-          body,
-          credentials: config.twilioCredentials,
-        })
+        await sendMessage(userPhone, body, config)
       }
     } else {
-      await twilioSvc.send({
-        to: userPhone,
-        from: whatsappNumber,
-        body,
-        credentials: config.twilioCredentials,
-      })
+      await sendMessage(userPhone, body, config)
     }
 
-    res.json({ success: true, data: { sent: true, to: userPhone, via: 'TWILIO' } })
+    res.json({ success: true, data: { sent: true, to: userPhone, via: config.bspType } })
   } catch (err: any) {
     console.error('[Internal] notify error:', err)
     res.status(500).json({ success: false, error: 'Failed to send notification' })

@@ -70,6 +70,7 @@ export class RoutingService {
     }
 
     // 4. Build PartnerConfig
+    const bspType = (data.config.bspType || 'TWILIO') as PartnerConfig['bspType']
     const partnerConfig: PartnerConfig = {
       partnerId: data.partnerId,
       partnerApiKey: data.partnerApiKey,
@@ -79,7 +80,17 @@ export class RoutingService {
       fallbackWebhook: data.config.fallbackWebhook,
       enabledCommands: data.config.enabledCommands as PartnerConfig['enabledCommands'],
       notificationsEnabled: data.config.notificationsEnabled,
+      bspType,
+      whatsappNumber: whatsappNumber.startsWith('+') ? whatsappNumber : `+${whatsappNumber}`,
       twilioCredentials,
+      // For META_CLOUD, bspCredentials are stored with accountSid=accessToken, authToken=phoneNumberId
+      metaCredentials: bspType === 'META_CLOUD'
+        ? {
+            accessToken: twilioCredentials.accountSid || process.env.META_ACCESS_TOKEN || '',
+            phoneNumberId: twilioCredentials.authToken || process.env.META_PHONE_NUMBER_ID || '',
+            wabaId: process.env.META_WABA_ID || '',
+          }
+        : undefined,
     }
 
     // 5. Cache

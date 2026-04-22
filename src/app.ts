@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express'
 import twilioRouter from './routes/twilio'
+import metaRouter from './routes/meta'
 import internalRouter from './routes/internal'
 import { receiptCache } from './services/twilio.service'
 
@@ -7,6 +8,9 @@ const app = express()
 
 // Twilio sends form-encoded — urlencoded parser only for webhook route
 app.use('/webhook/twilio', express.urlencoded({ extended: false }), twilioRouter)
+
+// Meta Cloud API webhook — GET for verification challenge, POST for inbound messages
+app.use('/webhook/meta', express.json(), metaRouter)
 
 // Internal routes use JSON
 app.use('/internal', express.json(), internalRouter)

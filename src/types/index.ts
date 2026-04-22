@@ -27,10 +27,17 @@ export interface PartnerConfig {
   fallbackWebhook: string | null
   enabledCommands: WACommand[]
   notificationsEnabled: boolean
+  bspType: 'TWILIO' | 'DIALOG360' | 'META_CLOUD'
+  whatsappNumber: string  // bot's display phone number e.g. +2348012345678
   twilioCredentials: {
     accountSid: string
     authToken: string
     messagingServiceSid: string
+  }
+  metaCredentials?: {
+    accessToken: string
+    phoneNumberId: string  // Meta's internal phone number ID
+    wabaId: string
   }
 }
 

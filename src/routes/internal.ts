@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { RoutingService } from '../services/routing.service'
 import { TwilioService } from '../services/twilio.service'
 import { SessionService } from '../services/session.service'
+import { generateReceipt } from '../services/receipt.service'
 
 const router = Router()
 const routing = new RoutingService()
@@ -75,12 +76,42 @@ router.post('/notify', requireServiceSecret, async (req: Request, res: Response)
 
     const body = applyVariables(template, variables)
 
-    await twilioSvc.send({
-      to: userPhone,
-      from: whatsappNumber,
-      body,
-      credentials: config.twilioCredentials,
-    })
+    const receiptData = (req.body as any).receiptData
+    const publicBotUrl = process.env.PUBLIC_BOT_URL
+
+    if (receiptData && publicBotUrl) {
+      try {
+        const receiptBuffer = await generateReceipt({
+          ...receiptData,
+          botName: (config as any).botName || 'GoGet',
+        })
+        const filename = `receipt_${receiptData.transactionId}_${Date.now()}.png`
+        await twilioSvc.sendWithImage({
+          to: userPhone,
+          from: whatsappNumber,
+          body,
+          imageBuffer: receiptBuffer,
+          filename,
+          credentials: config.twilioCredentials,
+          publicBaseUrl: publicBotUrl,
+        })
+      } catch (receiptErr) {
+        console.error('[Internal] Receipt generation failed, sending text only:', receiptErr)
+        await twilioSvc.send({
+          to: userPhone,
+          from: whatsappNumber,
+          body,
+          credentials: config.twilioCredentials,
+        })
+      }
+    } else {
+      await twilioSvc.send({
+        to: userPhone,
+        from: whatsappNumber,
+        body,
+        credentials: config.twilioCredentials,
+      })
+    }
 
     res.json({ success: true, data: { sent: true, to: userPhone, via: 'TWILIO' } })
   } catch (err: any) {

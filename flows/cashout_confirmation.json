@@ -1,0 +1,73 @@
+{
+    "version": "3.0",
+    "screens": [
+      {
+        "id": "CONFIRM_CASHOUT",
+        "title": "Confirm Cashout",
+        "terminal": true,
+        "success": true,
+        "layout": {
+          "type": "SingleColumnLayout",
+          "children": [
+            {
+              "type": "TextHeading",
+              "text": "Transaction Summary"
+            },
+            {
+              "type": "TextBody",
+              "text": "Amount to sell"
+            },
+            {
+              "type": "TextHeading",
+              "text": "{{crypto_amount}} {{asset}}"
+            },
+            {
+              "type": "TextBody",
+              "text": "You receive"
+            },
+            {
+              "type": "TextHeading",
+              "text": "₦{{ngn_amount}}"
+            },
+            {
+              "type": "TextBody",
+              "text": "Fee: ₦{{fee}}  •  Rate: 1 {{asset}} = ₦{{rate}}"
+            },
+            {
+              "type": "TextSubheading",
+              "text": "Sending to"
+            },
+            {
+              "type": "TextBody",
+              "text": "{{bank_name}} — ••••{{account_last4}}\n{{account_name}}"
+            },
+            {
+              "type": "TextInput",
+              "label": "Transaction PIN",
+              "name": "pin",
+              "input-type": "password",
+              "required": true,
+              "min-chars": 6,
+              "max-chars": 6,
+              "helper-text": "Enter your 6-digit PIN to confirm"
+            },
+            {
+              "type": "Footer",
+              "label": "Confirm & Send",
+              "on-click-action": {
+                "name": "data_exchange",
+                "payload": {
+                  "pin": "${form.pin}",
+                  "transaction_id": "{{transaction_id}}",
+                  "screen": "CONFIRM_CASHOUT"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+
+  https://developers.facebook.com/docs/whatsapp/flows
+https://developers.facebook.com/docs/whatsapp/flows/guides/implementingaflowsendpoint

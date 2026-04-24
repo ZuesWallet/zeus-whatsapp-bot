@@ -1,7 +1,6 @@
 import { ZeusPayService } from '../services/zeuspay.service'
 import { IntentService } from '../services/intent.service'
 import { metaService } from '../services/meta.service'
-import { getRedisClient } from '../lib/redis'
 import type { HandlerInput, HandlerOutput, ZeusPayEstimate, ZeusPayTransaction, PreparedCashout } from '../types'
 
 const zeuspay = new ZeusPayService()
@@ -55,39 +54,7 @@ async function openCashoutFlow(params: {
     }
   }
 
-  // 2 — Store screen data in Redis so the backend Flow endpoint can serve it on INIT
-  if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
-    const flowToken = `cashout_${prepared.transactionId}`
-    const ttlSeconds = Math.max(
-      Math.floor((new Date(prepared.expiresAt).getTime() - Date.now()) / 1000),
-      60
-    )
-    const assetDisplay = String(session.data.asset ?? '')
-      .replace('_ERC20', '')
-      .replace('_TRC20', '')
-      .replace('_BASE', '')
-
-    await getRedisClient().set(
-      `flow:init:${flowToken}`,
-      JSON.stringify({
-        crypto_amount: String(prepared.cryptoAmount ?? ''),
-        asset: assetDisplay,
-        ngn_amount: String(prepared.ngnAmount ?? ''),
-        fee: String(prepared.feeAmount ?? ''),
-        rate: String(prepared.rateUsed ?? ''),
-        bank_name: String(prepared.bankName ?? ''),
-        account_last4: String(prepared.accountLast4 ?? ''),
-        account_name: String(prepared.accountName ?? ''),
-        transaction_id: String(prepared.transactionId ?? ''),
-        error_message: '',
-        has_error: false,
-      }),
-      'EX',
-      ttlSeconds
-    )
-  }
-
-  // 3 — Send Flow message via Meta Cloud API (Meta partners only)
+  // 2 — Send Flow message (data_exchange mode — backend serves screen data on INIT)
   if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
     try {
       const flowToken = `cashout_${prepared.transactionId}`

@@ -10,8 +10,9 @@ export class RoutingService {
   // Resolve a WhatsApp number to full partner config.
   // Called on every inbound message — Redis-cached for 5 minutes.
   async resolve(whatsappNumber: string): Promise<PartnerConfig> {
+    const normalised = whatsappNumber.startsWith('+') ? whatsappNumber : '+' + whatsappNumber
     const redis = getRedisClient()
-    const cacheKey = CACHE_KEY(whatsappNumber)
+    const cacheKey = CACHE_KEY(normalised)
 
     // 1. Check cache
     const cached = await redis.get(cacheKey)
@@ -42,7 +43,7 @@ export class RoutingService {
       const response = await axios.get(
         `${apiUrl}/api/v1/admin/whatsapp/resolve`,
         {
-          params: { number: whatsappNumber },
+          params: { number: normalised },
           headers: { 'X-Service-Secret': serviceSecret },
           timeout: 5000,
         }
@@ -51,9 +52,9 @@ export class RoutingService {
     } catch (err: any) {
       const status = err.response?.status
       if (status === 404) {
-        throw new Error(`WhatsApp number not configured or not active: ${whatsappNumber}`)
+        throw new Error(`WhatsApp number not configured or not active: ${normalised}`)
       }
-      throw new Error(`Failed to resolve WhatsApp number ${whatsappNumber}: ${err.message}`)
+      throw new Error(`Failed to resolve WhatsApp number ${normalised}: ${err.message}`)
     }
 
     // 3. Decrypt BSP credentials
@@ -83,7 +84,7 @@ export class RoutingService {
         }
       }
     } catch (err: any) {
-      throw new Error(`Failed to decrypt BSP credentials for ${whatsappNumber}: ${err.message}`)
+      throw new Error(`Failed to decrypt BSP credentials for ${normalised}: ${err.message}`)
     }
 
     // 4. Build PartnerConfig
@@ -97,7 +98,7 @@ export class RoutingService {
       enabledCommands: data.config.enabledCommands as PartnerConfig['enabledCommands'],
       notificationsEnabled: data.config.notificationsEnabled,
       bspType,
-      whatsappNumber: whatsappNumber.startsWith('+') ? whatsappNumber : `+${whatsappNumber}`,
+      whatsappNumber: normalised,
       twilioCredentials,
       metaCredentials,
     }

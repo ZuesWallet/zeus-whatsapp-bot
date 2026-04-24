@@ -1,9 +1,115 @@
 import { ZeusPayService } from '../services/zeuspay.service'
 import { IntentService } from '../services/intent.service'
-import type { HandlerInput, HandlerOutput, ZeusPayEstimate, ZeusPayTransaction } from '../types'
+import { metaService } from '../services/meta.service'
+import type { HandlerInput, HandlerOutput, ZeusPayEstimate, ZeusPayTransaction, PreparedCashout } from '../types'
 
 const zeuspay = new ZeusPayService()
 const intentSvc = new IntentService()
+
+// ── Flow helper ───────────────────────────────────────────────────────────────
+
+/**
+ * Prepares a cashout transaction and sends a WhatsApp Flow message so the user
+ * can enter their PIN in the secure native UI instead of typing it in chat.
+ *
+ * Called from two places:
+ *  - After user selects an existing bank account (AWAITING_BANK)
+ *  - After user enters and resolves a new bank account (AWAITING_NEW_BANK_ACCT)
+ *
+ * Falls back to text PIN if the partner is on Twilio or if the Flow send fails.
+ */
+async function openCashoutFlow(params: {
+  message: HandlerInput['message']
+  session: HandlerInput['session']
+  config: HandlerInput['config']
+  bankCode: string
+  accountNumber: string
+  accountName: string
+}): Promise<HandlerOutput> {
+  const { message, session, config, bankCode, accountNumber, accountName } = params
+
+  // 1 — Prepare transaction: locks rate, creates PENDING record
+  let prepared: PreparedCashout
+  try {
+    prepared = await zeuspay.prepareCashout({
+      phone: message.from,
+      asset: session.data.asset!,
+      cryptoAmount: session.data.estimate!.cryptoAmount,
+      bankCode,
+      accountNumber,
+      accountName,
+      apiKey: config.partnerApiKey,
+    })
+  } catch (err: any) {
+    console.error('[cashout] prepareCashout failed', err)
+    if (err.code === 'INSUFFICIENT_BALANCE') {
+      return {
+        reply: '⚠️ Insufficient balance. Type *balance* to check your current balance.',
+        newSession: { flow: null, step: null, data: {} },
+      }
+    }
+    return {
+      reply: '⚠️ Could not prepare your cashout. Please try again shortly.',
+      newSession: { flow: null, step: null, data: {} },
+    }
+  }
+
+  // 2 — Send Flow message via Meta Cloud API (Meta partners only)
+  if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
+    try {
+      await metaService.sendFlow({
+        to: message.from,
+        phoneNumberId: config.metaCredentials.phoneNumberId,
+        accessToken: config.metaCredentials.accessToken,
+        flowId: process.env.META_FLOW_ID!,
+        flowCta: 'Confirm Cashout',
+        screenId: 'CONFIRM_CASHOUT',
+        flowData: prepared.flowData,
+      })
+
+      return {
+        reply: '',
+        newSession: {
+          flow: 'CASHOUT',
+          step: 'AWAITING_FLOW_SENT',
+          data: {
+            ...session.data,
+            transactionId: prepared.transactionId,
+            bankCode,
+            accountNumber,
+            accountName,
+          },
+        },
+      }
+    } catch (err) {
+      console.error('[cashout] sendFlow failed — falling back to text PIN', err)
+      // Fall through to text-PIN fallback
+    }
+  }
+
+  // Fallback: Twilio partners or Flow send failure → text PIN
+  const est = session.data.estimate!
+  return {
+    reply:
+      `✅ *Confirm Cashout*\n\n` +
+      `₦${parseFloat(est.ngnAmount).toLocaleString()} → ${accountName}\n` +
+      `Account: ••••${accountNumber.slice(-4)}\n\n` +
+      `Enter your *6-digit PIN* to confirm.\n` +
+      `Type *cancel* to abort.`,
+    newSession: {
+      ...session,
+      step: 'AWAITING_PIN',
+      data: {
+        ...session.data,
+        bankCode,
+        accountNumber,
+        accountName,
+      },
+    },
+  }
+}
+
+// ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput> {
   const { message, session, config } = input
@@ -157,28 +263,14 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
       }
     }
 
-    const est = session.data.estimate!
-    const reply =
-      `✅ *Confirm Cashout*\n\n` +
-      `₦${parseFloat(est.ngnAmount).toLocaleString()} → ${selected.bankName}\n` +
-      `Account: ••••${selected.accountNumber.slice(-4)} (${selected.accountName})\n\n` +
-      `Enter your *6-digit PIN* to confirm.\n` +
-      `Type *cancel* to abort.`
-
-    return {
-      reply,
-      newSession: {
-        ...session,
-        step: 'AWAITING_PIN',
-        data: {
-          ...session.data,
-          selectedBankAccountId: selected.id,
-          bankCode: selected.bankCode,
-          accountNumber: selected.accountNumber,
-          accountName: selected.accountName,
-        },
-      },
-    }
+    return await openCashoutFlow({
+      message,
+      session,
+      config,
+      bankCode: selected.bankCode,
+      accountNumber: selected.accountNumber,
+      accountName: selected.accountName,
+    })
   }
 
   // ── STEP: AWAITING_NEW_BANK_NAME — user types their bank name ────────────
@@ -288,24 +380,29 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
       }
     }
 
-    const est = session.data.estimate!
+    return await openCashoutFlow({
+      message,
+      session,
+      config,
+      bankCode: session.data.bankCode!,
+      accountNumber,
+      accountName: resolvedName,
+    })
+  }
+
+  // ── STEP: AWAITING_FLOW_SENT ───────────────────────────────────────────────
+  // Flow message sent — user is completing PIN entry in the native Flow UI.
+  // If they text us while the Flow is open, nudge them back to it.
+  if (session.step === 'AWAITING_FLOW_SENT') {
     return {
       reply:
-        `✅ *Confirm Cashout*\n\n` +
-        `₦${parseFloat(est.ngnAmount).toLocaleString()} → ${resolvedName}\n` +
-        `Bank: ${session.data.bankName}\n` +
-        `Account: ••••${accountNumber.slice(-4)}\n\n` +
-        `Enter your *6-digit PIN* to confirm.\n` +
-        `Type *cancel* to abort.`,
-      newSession: {
-        ...session,
-        step: 'AWAITING_PIN',
-        data: { ...session.data, accountNumber, accountName: resolvedName },
-      },
+        '📱 Please complete your cashout in the secure confirmation screen.\n\n' +
+        'If it has closed or expired, type *cash out* to start again.',
+      newSession: session,
     }
   }
 
-  // ── STEP: AWAITING_PIN ────────────────────────────────────────────────────
+  // ── STEP: AWAITING_PIN (fallback for Twilio or Flow send failure) ─────────
   if (session.step === 'AWAITING_PIN') {
     if (intent.type !== 'PIN_ENTRY') {
       return {
@@ -316,7 +413,6 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
 
     const { data } = session
 
-    // First verify the PIN — get a short-lived token, then use it for the cashout
     let pinToken: string
     try {
       pinToken = await zeuspay.verifyPin(message.from, intent.pin!, config.partnerApiKey)
@@ -372,7 +468,7 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
       }
     }
 
-    void transaction // used for type-checking; reply is enough
+    void transaction
 
     return {
       reply:

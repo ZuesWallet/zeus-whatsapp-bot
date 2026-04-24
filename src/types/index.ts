@@ -149,3 +149,21 @@ export interface ZeusPayUser {
   externalUserId: string
   zeuspayUserId: string
 }
+
+export interface PreparedCashout {
+  transactionId: string
+  flowData: {
+    crypto_amount: string
+    asset: string
+    ngn_amount: string
+    fee: string
+    rate: string
+    bank_name: string
+    account_last4: string
+    account_name: string
+    transaction_id: string
+    error_message: string
+    has_error: string
+  }
+  expiresAt: string
+}

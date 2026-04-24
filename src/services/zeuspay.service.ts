@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import type {
   ZeusPayUser, ZeusPayWallet, ZeusPayRate, ZeusPayEstimate,
-  ZeusPayTransaction, ZeusPayBankAccount,
+  ZeusPayTransaction, ZeusPayBankAccount, PreparedCashout,
 } from '../types'
 
 class ZeusPayError extends Error {
@@ -162,6 +162,33 @@ export class ZeusPayService {
         }
       )
       return res.data.data as ZeusPayTransaction
+    })
+  }
+
+  async prepareCashout(params: {
+    phone: string
+    asset: string
+    cryptoAmount: string
+    bankCode: string
+    accountNumber: string
+    accountName: string
+    apiKey: string
+  }): Promise<PreparedCashout> {
+    return this.withRetry(async () => {
+      const res = await this.client(params.apiKey).post(
+        '/api/v1/partner/cashout/prepare',
+        {
+          externalUserId: params.phone,
+          asset: params.asset,
+          cryptoAmount: params.cryptoAmount,
+          bankAccount: {
+            bankCode: params.bankCode,
+            accountNumber: params.accountNumber,
+            accountName: params.accountName,
+          },
+        }
+      )
+      return res.data.data as PreparedCashout
     })
   }
 

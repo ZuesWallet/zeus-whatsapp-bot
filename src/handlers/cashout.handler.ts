@@ -55,40 +55,23 @@ async function openCashoutFlow(params: {
     }
   }
 
-  // 2 — Store pending cashout in Redis so the Flow endpoint can look it up by transactionId
+  // 2 — Store screen data in Redis so the backend Flow endpoint can serve it on INIT
   if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
+    const flowToken = `cashout_${prepared.transactionId}`
     const ttlSeconds = Math.max(
       Math.floor((new Date(prepared.expiresAt).getTime() - Date.now()) / 1000),
       60
     )
+    const assetDisplay = String(session.data.asset ?? '')
+      .replace('_ERC20', '')
+      .replace('_TRC20', '')
+      .replace('_BASE', '')
+
     await getRedisClient().set(
-      `flow:cashout:${prepared.transactionId}`,
+      `flow:init:${flowToken}`,
       JSON.stringify({
-        phone: message.from,
-        partnerId: config.partnerId,
-        partnerApiKey: config.partnerApiKey,
-        asset: session.data.asset,
-        cryptoAmount: session.data.estimate!.cryptoAmount,
-        bankCode,
-        accountNumber,
-        accountName,
-        ngnAmount: prepared.ngnAmount,
-        bankName: prepared.bankName,
-        accountLast4: prepared.accountLast4,
-      }),
-      'EX',
-      ttlSeconds
-    )
-  }
-
-  // 3 — Send Flow message via Meta Cloud API (Meta partners only)
-  if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
-    try {
-      console.log('[openCashoutFlow] prepared:', JSON.stringify(prepared, null, 2))
-
-      const flowData: Record<string, unknown> = {
         crypto_amount: String(prepared.cryptoAmount ?? ''),
-        asset: String(session.data.asset ?? ''),
+        asset: assetDisplay,
         ngn_amount: String(prepared.ngnAmount ?? ''),
         fee: String(prepared.feeAmount ?? ''),
         rate: String(prepared.rateUsed ?? ''),
@@ -98,9 +81,16 @@ async function openCashoutFlow(params: {
         transaction_id: String(prepared.transactionId ?? ''),
         error_message: '',
         has_error: false,
-      }
+      }),
+      'EX',
+      ttlSeconds
+    )
+  }
 
-      console.log('[openCashoutFlow] final flowData being sent:', JSON.stringify(flowData, null, 2))
+  // 3 — Send Flow message via Meta Cloud API (Meta partners only)
+  if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
+    try {
+      const flowToken = `cashout_${prepared.transactionId}`
 
       await metaService.sendFlow({
         to: message.from,
@@ -109,7 +99,8 @@ async function openCashoutFlow(params: {
         flowId: process.env.META_FLOW_ID!,
         flowCta: 'Confirm Cashout',
         screenId: 'CONFIRM_CASHOUT',
-        flowData,
+        flowData: {},
+        flowToken,
       })
 
       return {

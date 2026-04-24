@@ -41,16 +41,11 @@ export class MetaService {
     accessToken: string
     flowId: string
     flowCta: string
-    screenId: string
-    flowData: Record<string, unknown>
+    screenId: string          // for reference only — not sent inline in data_exchange mode
+    flowData: Record<string, unknown>  // for reference only — backend serves data on INIT
+    flowToken: string         // unique per cashout — backend uses this to look up screen data
   }): Promise<void> {
     const to = params.to.replace('whatsapp:', '').replace('+', '')
-
-    console.log('[metaService.sendFlow] to:', to)
-    console.log('[metaService.sendFlow] flowId:', params.flowId)
-    console.log('[metaService.sendFlow] screenId:', params.screenId)
-    console.log('[metaService.sendFlow] flowData keys:', Object.keys(params.flowData))
-    console.log('[metaService.sendFlow] flowData:', JSON.stringify(params.flowData))
 
     const payload = {
       messaging_product: 'whatsapp',
@@ -66,19 +61,16 @@ export class MetaService {
           name: 'flow',
           parameters: {
             flow_message_version: '3',
+            flow_token: params.flowToken,
             flow_id: params.flowId,
             flow_cta: params.flowCta,
-            flow_action: 'navigate',
-            flow_action_payload: {
-              screen: params.screenId,
-              data: params.flowData,
-            },
+            flow_action: 'data_exchange',
           },
         },
       },
     }
 
-    console.log('[metaService.sendFlow] full payload:', JSON.stringify(payload, null, 2))
+    console.log('[metaService.sendFlow] payload:', JSON.stringify(payload, null, 2))
 
     await axios.post(
       `${META_API_BASE}/${params.phoneNumberId}/messages`,

@@ -57,6 +57,26 @@ async function openCashoutFlow(params: {
   // 2 — Send Flow message via Meta Cloud API (Meta partners only)
   if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
     try {
+      console.log('[openCashoutFlow] prepared.flowData:', JSON.stringify(prepared.flowData, null, 2))
+      console.log('[openCashoutFlow] transactionId:', prepared.transactionId)
+
+      // Ensure all values are strings — WhatsApp Flow requires string values
+      const flowData: Record<string, string> = {
+        crypto_amount: String(prepared.flowData.crypto_amount ?? ''),
+        asset: String(prepared.flowData.asset ?? ''),
+        ngn_amount: String(prepared.flowData.ngn_amount ?? ''),
+        fee: String(prepared.flowData.fee ?? ''),
+        rate: String(prepared.flowData.rate ?? ''),
+        bank_name: String(prepared.flowData.bank_name ?? ''),
+        account_last4: String(prepared.flowData.account_last4 ?? ''),
+        account_name: String(prepared.flowData.account_name ?? ''),
+        transaction_id: String(prepared.flowData.transaction_id ?? prepared.transactionId ?? ''),
+        error_message: '',
+        has_error: 'false',
+      }
+
+      console.log('[openCashoutFlow] final flowData being sent:', JSON.stringify(flowData, null, 2))
+
       await metaService.sendFlow({
         to: message.from,
         phoneNumberId: config.metaCredentials.phoneNumberId,
@@ -64,7 +84,7 @@ async function openCashoutFlow(params: {
         flowId: process.env.META_FLOW_ID!,
         flowCta: 'Confirm Cashout',
         screenId: 'CONFIRM_CASHOUT',
-        flowData: prepared.flowData,
+        flowData,
       })
 
       return {

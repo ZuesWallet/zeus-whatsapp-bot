@@ -46,33 +46,43 @@ export class MetaService {
   }): Promise<void> {
     const to = params.to.replace('whatsapp:', '').replace('+', '')
 
-    await axios.post(
-      `${META_API_BASE}/${params.phoneNumberId}/messages`,
-      {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to,
-        type: 'interactive',
-        interactive: {
-          type: 'flow',
-          body: {
-            text: 'Review your transaction details and enter your PIN to confirm.',
-          },
-          action: {
-            name: 'flow',
-            parameters: {
-              flow_message_version: '3',
-              flow_id: params.flowId,
-              flow_cta: params.flowCta,
-              flow_action: 'navigate',
-              flow_action_payload: {
-                screen: params.screenId,
-                data: params.flowData,
-              },
+    console.log('[metaService.sendFlow] to:', to)
+    console.log('[metaService.sendFlow] flowId:', params.flowId)
+    console.log('[metaService.sendFlow] screenId:', params.screenId)
+    console.log('[metaService.sendFlow] flowData keys:', Object.keys(params.flowData))
+    console.log('[metaService.sendFlow] flowData:', JSON.stringify(params.flowData))
+
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'flow',
+        body: {
+          text: 'Review your transaction details and enter your PIN to confirm.',
+        },
+        action: {
+          name: 'flow',
+          parameters: {
+            flow_message_version: '3',
+            flow_id: params.flowId,
+            flow_cta: params.flowCta,
+            flow_action: 'navigate',
+            flow_action_payload: {
+              screen: params.screenId,
+              data: params.flowData,
             },
           },
         },
       },
+    }
+
+    console.log('[metaService.sendFlow] full payload:', JSON.stringify(payload, null, 2))
+
+    await axios.post(
+      `${META_API_BASE}/${params.phoneNumberId}/messages`,
+      payload,
       {
         headers: {
           Authorization: `Bearer ${params.accessToken}`,

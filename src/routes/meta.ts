@@ -63,8 +63,8 @@ router.post('/', (req: Request, res: Response) => {
             let config
             try {
               config = await routing.resolve(metadata.display_phone_number)
-            } catch {
-              console.error(`[Meta] No partner config for number: ${metadata.display_phone_number}`)
+            } catch (err: any) {
+              console.error(`[Meta] No partner config for number: ${metadata.display_phone_number} — ${err?.message}`)
               continue
             }
 

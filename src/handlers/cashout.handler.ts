@@ -1,6 +1,7 @@
 import { ZeusPayService } from '../services/zeuspay.service'
 import { IntentService } from '../services/intent.service'
 import { metaService } from '../services/meta.service'
+import { getRedisClient } from '../lib/redis'
 import type { HandlerInput, HandlerOutput, ZeusPayEstimate, ZeusPayTransaction, PreparedCashout } from '../types'
 
 const zeuspay = new ZeusPayService()
@@ -54,13 +55,38 @@ async function openCashoutFlow(params: {
     }
   }
 
-  // 2 — Send Flow message via Meta Cloud API (Meta partners only)
+  // 2 — Store pending cashout in Redis so the Flow endpoint can look it up by transactionId
+  if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
+    const ttlSeconds = Math.max(
+      Math.floor((new Date(prepared.expiresAt).getTime() - Date.now()) / 1000),
+      60
+    )
+    await getRedisClient().set(
+      `flow:cashout:${prepared.transactionId}`,
+      JSON.stringify({
+        phone: message.from,
+        partnerId: config.partnerId,
+        partnerApiKey: config.partnerApiKey,
+        asset: session.data.asset,
+        cryptoAmount: session.data.estimate!.cryptoAmount,
+        bankCode,
+        accountNumber,
+        accountName,
+        ngnAmount: prepared.ngnAmount,
+        bankName: prepared.bankName,
+        accountLast4: prepared.accountLast4,
+      }),
+      'EX',
+      ttlSeconds
+    )
+  }
+
+  // 3 — Send Flow message via Meta Cloud API (Meta partners only)
   if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
     try {
       console.log('[openCashoutFlow] prepared:', JSON.stringify(prepared, null, 2))
 
-      // Build flow data from flat backend response fields
-      const flowData: Record<string, string> = {
+      const flowData: Record<string, unknown> = {
         crypto_amount: String(prepared.cryptoAmount ?? ''),
         asset: String(session.data.asset ?? ''),
         ngn_amount: String(prepared.ngnAmount ?? ''),
@@ -71,7 +97,7 @@ async function openCashoutFlow(params: {
         account_name: String(prepared.accountName ?? ''),
         transaction_id: String(prepared.transactionId ?? ''),
         error_message: '',
-        has_error: 'false',
+        has_error: false,
       }
 
       console.log('[openCashoutFlow] final flowData being sent:', JSON.stringify(flowData, null, 2))

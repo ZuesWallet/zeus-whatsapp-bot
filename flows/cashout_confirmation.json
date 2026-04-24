@@ -1,73 +1,125 @@
 {
-    "version": "3.0",
-    "screens": [
-      {
-        "id": "CONFIRM_CASHOUT",
-        "title": "Confirm Cashout",
-        "terminal": true,
-        "success": true,
-        "layout": {
-          "type": "SingleColumnLayout",
-          "children": [
-            {
-              "type": "TextHeading",
-              "text": "Transaction Summary"
-            },
-            {
-              "type": "TextBody",
-              "text": "Amount to sell"
-            },
-            {
-              "type": "TextHeading",
-              "text": "{{crypto_amount}} {{asset}}"
-            },
-            {
-              "type": "TextBody",
-              "text": "You receive"
-            },
-            {
-              "type": "TextHeading",
-              "text": "₦{{ngn_amount}}"
-            },
-            {
-              "type": "TextBody",
-              "text": "Fee: ₦{{fee}}  •  Rate: 1 {{asset}} = ₦{{rate}}"
-            },
-            {
-              "type": "TextSubheading",
-              "text": "Sending to"
-            },
-            {
-              "type": "TextBody",
-              "text": "{{bank_name}} — ••••{{account_last4}}\n{{account_name}}"
-            },
-            {
-              "type": "TextInput",
-              "label": "Transaction PIN",
-              "name": "pin",
-              "input-type": "password",
-              "required": true,
-              "min-chars": 6,
-              "max-chars": 6,
-              "helper-text": "Enter your 6-digit PIN to confirm"
-            },
-            {
-              "type": "Footer",
-              "label": "Confirm & Send",
-              "on-click-action": {
-                "name": "data_exchange",
-                "payload": {
-                  "pin": "${form.pin}",
-                  "transaction_id": "{{transaction_id}}",
-                  "screen": "CONFIRM_CASHOUT"
-                }
+  "version": "7.3",
+  "data_api_version": "4.0",
+  "routing_model": {
+    "CONFIRM_CASHOUT": ["SUCCESS"],
+    "SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "CONFIRM_CASHOUT",
+      "title": "Confirm Cashout",
+      "data": {
+        "crypto_amount": { "type": "string", "__example__": "100" },
+        "asset": { "type": "string", "__example__": "USDT" },
+        "ngn_amount": { "type": "string", "__example__": "135,876.00" },
+        "fee": { "type": "string", "__example__": "2,038.14" },
+        "rate": { "type": "string", "__example__": "1,379" },
+        "bank_name": { "type": "string", "__example__": "GTBank" },
+        "account_last4": { "type": "string", "__example__": "6789" },
+        "account_name": { "type": "string", "__example__": "JOHN DOE" },
+        "transaction_id": { "type": "string", "__example__": "txn_abc123" },
+        "error_message": { "type": "string", "__example__": "" },
+        "has_error": { "type": "boolean", "__example__": false }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Transaction Summary"
+          },
+          {
+            "type": "TextBody",
+            "text": "Selling: ${data.crypto_amount} ${data.asset}"
+          },
+          {
+            "type": "TextBody",
+            "text": "You receive: ₦${data.ngn_amount}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Fee: ₦${data.fee}  •  Rate: 1 ${data.asset} = ₦${data.rate}"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Sending to"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.bank_name} — ••••${data.account_last4}\n${data.account_name}"
+          },
+          {
+            "type": "If",
+            "condition": "${data.has_error}",
+            "then": [
+              {
+                "type": "TextBody",
+                "text": "⚠️ ${data.error_message}"
+              }
+            ],
+            "else": []
+          },
+          {
+            "type": "TextInput",
+            "label": "Transaction PIN",
+            "name": "pin",
+            "input-type": "password",
+            "required": true,
+            "min-chars": 6,
+            "max-chars": 6,
+            "helper-text": "Enter your 6-digit PIN to confirm",
+            "label-variant": "large"
+          },
+          {
+            "type": "Footer",
+            "label": "Confirm & Send",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "pin": "${form.pin}",
+                "transaction_id": "${data.transaction_id}"
               }
             }
-          ]
-        }
+          }
+        ]
       }
-    ]
-  }
-
-  https://developers.facebook.com/docs/whatsapp/flows
-https://developers.facebook.com/docs/whatsapp/flows/guides/implementingaflowsendpoint
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Cashout Submitted",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "ngn_amount": { "type": "string", "__example__": "135,876.00" },
+        "bank_name": { "type": "string", "__example__": "GTBank" },
+        "account_last4": { "type": "string", "__example__": "6789" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "You're all set! ✅"
+          },
+          {
+            "type": "TextBody",
+            "text": "₦${data.ngn_amount} is on its way to your ${data.bank_name} account ending in ••••${data.account_last4}."
+          },
+          {
+            "type": "TextBody",
+            "text": "We'll send you a message when the transfer is confirmed. This usually takes under 5 minutes."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

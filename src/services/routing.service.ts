@@ -57,20 +57,36 @@ export class RoutingService {
     }
 
     // 3. Decrypt BSP credentials
+    const bspType = (data.config.bspType || 'TWILIO') as PartnerConfig['bspType']
+
     let twilioCredentials: { accountSid: string; authToken: string; messagingServiceSid: string }
+    let metaCredentials: PartnerConfig['metaCredentials']
+
     try {
       const creds = decryptCredentials(data.config.bspCredentials)
-      twilioCredentials = {
-        accountSid: creds.accountSid,
-        authToken: creds.authToken,
-        messagingServiceSid: creds.messagingServiceSid,
+
+      if (bspType === 'META_CLOUD') {
+        // Credentials stored as MetaCloudCredentials: { accessToken, phoneNumberId, wabaId }
+        const meta = creds as { accessToken?: string; phoneNumberId?: string; wabaId?: string }
+        metaCredentials = {
+          accessToken: meta.accessToken || process.env.META_ACCESS_TOKEN || '',
+          phoneNumberId: meta.phoneNumberId || process.env.META_PHONE_NUMBER_ID || '',
+          wabaId: meta.wabaId || process.env.META_WABA_ID || '',
+        }
+        // Twilio fields not used for Meta — fill with empty strings to satisfy the type
+        twilioCredentials = { accountSid: '', authToken: '', messagingServiceSid: '' }
+      } else {
+        twilioCredentials = {
+          accountSid: (creds as { accountSid?: string }).accountSid || '',
+          authToken: (creds as { authToken?: string }).authToken || '',
+          messagingServiceSid: (creds as { messagingServiceSid?: string }).messagingServiceSid || '',
+        }
       }
     } catch (err: any) {
-      throw new Error(`Failed to decrypt Twilio credentials for ${whatsappNumber}: ${err.message}`)
+      throw new Error(`Failed to decrypt BSP credentials for ${whatsappNumber}: ${err.message}`)
     }
 
     // 4. Build PartnerConfig
-    const bspType = (data.config.bspType || 'TWILIO') as PartnerConfig['bspType']
     const partnerConfig: PartnerConfig = {
       partnerId: data.partnerId,
       partnerApiKey: data.partnerApiKey,
@@ -83,14 +99,7 @@ export class RoutingService {
       bspType,
       whatsappNumber: whatsappNumber.startsWith('+') ? whatsappNumber : `+${whatsappNumber}`,
       twilioCredentials,
-      // For META_CLOUD, bspCredentials are stored with accountSid=accessToken, authToken=phoneNumberId
-      metaCredentials: bspType === 'META_CLOUD'
-        ? {
-            accessToken: twilioCredentials.accountSid || process.env.META_ACCESS_TOKEN || '',
-            phoneNumberId: twilioCredentials.authToken || process.env.META_PHONE_NUMBER_ID || '',
-            wabaId: process.env.META_WABA_ID || '',
-          }
-        : undefined,
+      metaCredentials,
     }
 
     // 5. Cache

@@ -57,20 +57,19 @@ async function openCashoutFlow(params: {
   // 2 — Send Flow message via Meta Cloud API (Meta partners only)
   if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
     try {
-      console.log('[openCashoutFlow] prepared.flowData:', JSON.stringify(prepared.flowData, null, 2))
-      console.log('[openCashoutFlow] transactionId:', prepared.transactionId)
+      console.log('[openCashoutFlow] prepared:', JSON.stringify(prepared, null, 2))
 
-      // Ensure all values are strings — WhatsApp Flow requires string values
+      // Build flow data from flat backend response fields
       const flowData: Record<string, string> = {
-        crypto_amount: String(prepared.flowData.crypto_amount ?? ''),
-        asset: String(prepared.flowData.asset ?? ''),
-        ngn_amount: String(prepared.flowData.ngn_amount ?? ''),
-        fee: String(prepared.flowData.fee ?? ''),
-        rate: String(prepared.flowData.rate ?? ''),
-        bank_name: String(prepared.flowData.bank_name ?? ''),
-        account_last4: String(prepared.flowData.account_last4 ?? ''),
-        account_name: String(prepared.flowData.account_name ?? ''),
-        transaction_id: String(prepared.flowData.transaction_id ?? prepared.transactionId ?? ''),
+        crypto_amount: String(prepared.cryptoAmount ?? ''),
+        asset: String(session.data.asset ?? ''),
+        ngn_amount: String(prepared.ngnAmount ?? ''),
+        fee: String(prepared.feeAmount ?? ''),
+        rate: String(prepared.rateUsed ?? ''),
+        bank_name: String(prepared.bankName ?? ''),
+        account_last4: String(prepared.accountLast4 ?? ''),
+        account_name: String(prepared.accountName ?? ''),
+        transaction_id: String(prepared.transactionId ?? ''),
         error_message: '',
         has_error: 'false',
       }

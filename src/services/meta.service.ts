@@ -41,9 +41,9 @@ export class MetaService {
     accessToken: string
     flowId: string
     flowCta: string
-    screenId: string          // for reference only — not sent inline in data_exchange mode
-    flowData: Record<string, unknown>  // for reference only — backend serves data on INIT
-    flowToken: string         // unique per cashout — backend uses this to look up screen data
+    screenId: string
+    flowData: Record<string, string>
+    flowToken: string
   }): Promise<void> {
     const to = params.to.replace('whatsapp:', '').replace('+', '')
 
@@ -64,7 +64,11 @@ export class MetaService {
             flow_token: params.flowToken,
             flow_id: params.flowId,
             flow_cta: params.flowCta,
-            flow_action: 'data_exchange',
+            flow_action: 'navigate',
+            flow_action_payload: {
+              screen: params.screenId,
+              data: params.flowData,
+            },
           },
         },
       },

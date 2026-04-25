@@ -63,27 +63,34 @@ async function openCashoutFlow(params: {
         Math.floor((new Date(prepared.expiresAt).getTime() - Date.now()) / 1000),
         60
       )
-      const assetDisplay = String(session.data.asset ?? prepared.transactionId)
+      const assetDisplay = String(session.data.asset ?? '')
         .replace('_ERC20', '')
         .replace('_TRC20', '')
         .replace('_BASE', '')
 
+      const flowData: Record<string, string> = {
+        crypto_amount: String(prepared.cryptoAmount ?? ''),
+        asset: assetDisplay,
+        ngn_amount: String(prepared.ngnAmount ?? ''),
+        fee: String(prepared.feeAmount ?? ''),
+        rate: String(prepared.rateUsed ?? ''),
+        bank_name: String(prepared.bankName ?? ''),
+        account_last4: String(prepared.accountLast4 ?? ''),
+        account_name: String(prepared.accountName ?? ''),
+        transaction_id: String(prepared.transactionId ?? ''),
+      }
+
+      if (!flowData.transaction_id) {
+        console.error('[openCashoutFlow] transaction_id is empty — aborting Flow send')
+        throw new Error('transaction_id missing from prepared cashout')
+      }
+
+      console.log('[openCashoutFlow] flowData to inject:', JSON.stringify(flowData, null, 2))
+
       const redis = getRedisClient()
       await redis.set(
         `flow:init:${flowToken}`,
-        JSON.stringify({
-          crypto_amount: prepared.cryptoAmount,
-          asset: assetDisplay,
-          ngn_amount: prepared.ngnAmount,
-          fee: prepared.feeAmount,
-          rate: prepared.rateUsed,
-          bank_name: prepared.bankName,
-          account_last4: prepared.accountLast4,
-          account_name: prepared.accountName,
-          transaction_id: prepared.transactionId,
-          error_message: '',
-          has_error: false,
-        }),
+        JSON.stringify(flowData),
         'EX',
         ttlSeconds
       )
@@ -95,7 +102,7 @@ async function openCashoutFlow(params: {
         flowId: process.env.META_FLOW_ID!,
         flowCta: 'Confirm Cashout',
         screenId: 'CONFIRM_CASHOUT',
-        flowData: {},
+        flowData,
         flowToken,
       })
 

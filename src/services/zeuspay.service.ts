@@ -99,6 +99,15 @@ export class ZeusPayService {
     })
   }
 
+  async hasPinSet(phone: string, apiKey: string): Promise<boolean> {
+    return this.withRetry(async () => {
+      const res = await this.client(apiKey).get(
+        `/api/v1/partner/users/${encodeURIComponent(phone)}/pin/status`
+      )
+      return (res.data as { data: { pinSet: boolean } }).data.pinSet
+    })
+  }
+
   async setPin(phone: string, pin: string, apiKey: string): Promise<void> {
     return this.withRetry(async () => {
       await this.client(apiKey).post(

@@ -2,6 +2,7 @@ import { ZeusPayService } from '../services/zeuspay.service'
 import { IntentService } from '../services/intent.service'
 import { metaService } from '../services/meta.service'
 import { getRedisClient } from '../lib/redis'
+import { matchBanks } from '../lib/bankMatch'
 import type { HandlerInput, HandlerOutput, ZeusPayEstimate, ZeusPayTransaction, PreparedCashout } from '../types'
 
 const zeuspay = new ZeusPayService()
@@ -165,6 +166,26 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
 
   // ── STEP: AWAITING_AMOUNT (or first entry with no step) ───────────────────
   if (!session.step || session.step === 'AWAITING_AMOUNT') {
+    // Enforce PIN before cashout can begin
+    if (!session.step) {
+      let pinSet = false
+      try {
+        pinSet = await zeuspay.hasPinSet(message.from, config.partnerApiKey)
+      } catch {
+        // If status check fails, let the flow continue — PIN will be required at confirm step anyway
+        pinSet = true
+      }
+      if (!pinSet) {
+        return {
+          reply:
+            '🔐 *PIN Required*\n\n' +
+            'You need to set a transaction PIN before you can cash out.\n\n' +
+            'Type *set pin* to create your PIN, then try again.',
+          newSession: { flow: null, step: null, data: {} },
+        }
+      }
+    }
+
     const amount =
       intent.type === 'CASHOUT' && intent.amount
         ? intent.amount
@@ -327,12 +348,7 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
     }
 
     const query = message.body.trim()
-    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
-    const q = norm(query)
-    const matches = banks.filter((b) => {
-      const n = norm(b.name)
-      return n.includes(q) || q.includes(n)
-    })
+    const matches = matchBanks(query, banks)
 
     if (matches.length === 0) {
       return {

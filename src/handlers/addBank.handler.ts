@@ -1,25 +1,10 @@
 import { ZeusPayService } from '../services/zeuspay.service'
 import { IntentService } from '../services/intent.service'
+import { matchBanks } from '../lib/bankMatch'
 import type { HandlerInput, HandlerOutput } from '../types'
 
 const zeuspay = new ZeusPayService()
 const intentSvc = new IntentService()
-
-/** Case-insensitive substring match, normalised to strip punctuation. */
-function normaliseName(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, '')
-}
-
-function matchBanks(
-  query: string,
-  banks: { code: string; name: string }[]
-): { code: string; name: string }[] {
-  const q = normaliseName(query)
-  return banks.filter((b) => {
-    const n = normaliseName(b.name)
-    return n.includes(q) || q.includes(n)
-  })
-}
 
 export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput> {
   const { message, session, config } = input

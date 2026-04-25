@@ -43,10 +43,34 @@ async function openCashoutFlow(params: {
       apiKey: config.partnerApiKey,
     })
   } catch (err: any) {
-    console.error('[cashout] prepareCashout failed', err)
+    console.error('[cashout] prepareCashout failed', { code: err.code, message: err.message, details: err.details })
     if (err.code === 'INSUFFICIENT_BALANCE') {
       return {
         reply: '⚠️ Insufficient balance. Type *balance* to check your current balance.',
+        newSession: { flow: null, step: null, data: {} },
+      }
+    }
+    if (err.code === 'BELOW_MINIMUM') {
+      return {
+        reply: `⚠️ Amount too small. ${err.message || 'Minimum cashout is $1.'}`,
+        newSession: { flow: null, step: null, data: {} },
+      }
+    }
+    if (err.code === 'VOLUME_LIMIT_EXCEEDED') {
+      return {
+        reply: '⚠️ Cashout limit reached for today. Please try again tomorrow.',
+        newSession: { flow: null, step: null, data: {} },
+      }
+    }
+    if (err.code === 'WALLET_NOT_FOUND') {
+      return {
+        reply: '⚠️ No wallet found for that asset. Type *wallet* to see your deposit addresses.',
+        newSession: { flow: null, step: null, data: {} },
+      }
+    }
+    if (err.code === 'VALIDATION_ERROR') {
+      return {
+        reply: `⚠️ Invalid request: ${err.message || 'please check your details and try again.'}`,
         newSession: { flow: null, step: null, data: {} },
       }
     }
@@ -513,9 +537,22 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
         apiKey: config.partnerApiKey,
       })
     } catch (err: any) {
+      console.error('[cashout] cashout failed', { code: err.code, message: err.message })
       if (err.code === 'INSUFFICIENT_BALANCE') {
         return {
           reply: '⚠️ Insufficient balance. Type *balance* to check your current balance.',
+          newSession: { flow: null, step: null, data: {} },
+        }
+      }
+      if (err.code === 'BELOW_MINIMUM') {
+        return {
+          reply: `⚠️ Amount too small. ${err.message || 'Minimum cashout is $1.'}`,
+          newSession: { flow: null, step: null, data: {} },
+        }
+      }
+      if (err.code === 'INVALID_PIN_TOKEN') {
+        return {
+          reply: '⏱️ Your PIN confirmation expired. Type *cash out* to start again.',
           newSession: { flow: null, step: null, data: {} },
         }
       }

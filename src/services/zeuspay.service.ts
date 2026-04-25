@@ -45,13 +45,20 @@ export class ZeusPayService {
   }
 
   private normalise(err: AxiosError): ZeusPayError {
-    type ErrBody = { code?: string; message?: string; details?: Record<string, unknown> }
     if (err.response) {
+      // Backend wraps errors as { success: false, error: { code, message, details } }
+      type ErrBody = {
+        error?: { code?: string; message?: string; details?: Record<string, unknown> }
+        code?: string
+        message?: string
+        details?: Record<string, unknown>
+      }
       const body = err.response.data as ErrBody
+      const inner = body?.error ?? body
       return new ZeusPayError(
-        body?.code || 'ZEUSPAY_ERROR',
-        body?.message || 'ZeusPay API error',
-        body?.details
+        inner?.code || 'ZEUSPAY_ERROR',
+        inner?.message || 'ZeusPay API error',
+        inner?.details
       )
     }
     return new ZeusPayError('NETWORK_ERROR', err.message || 'Network error')

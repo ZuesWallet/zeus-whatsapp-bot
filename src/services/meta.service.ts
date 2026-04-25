@@ -64,11 +64,7 @@ export class MetaService {
             flow_token: params.flowToken,
             flow_id: params.flowId,
             flow_cta: params.flowCta,
-            flow_action: 'navigate',
-            flow_action_payload: {
-              screen: params.screenId,
-              data: params.flowData,
-            },
+            flow_action: 'data_exchange',
           },
         },
       },

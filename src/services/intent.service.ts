@@ -133,6 +133,10 @@ export class IntentService {
         BTC: 'BTC',
         ETH: 'ETH',
         BNB: 'BNB',
+        USDT_ERC20: 'USDT_ERC20',
+        USDT_TRC20: 'USDT_TRC20',
+        USDC_ERC20: 'USDC_ERC20',
+        USDC_BASE: 'USDC_BASE',
       }
       const asset = assetRaw ? assetMap[assetRaw] : undefined
 

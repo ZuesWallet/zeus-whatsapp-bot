@@ -176,8 +176,9 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
       return {
         reply:
           '💸 *Cash Out*\n\n' +
-          'How much USDT would you like to cash out?\n\n' +
-          '_Reply with just the amount e.g. *100*_\n\n' +
+          'How much crypto would you like to cash out?\n\n' +
+          '_Reply with just the amount, e.g. *100* (we\'ll use the asset you have balance in)_\n\n' +
+          '_You can also specify: *100 USDT*, *0.001 BTC*, *1 ETH*_\n\n' +
           'Type *cancel* to abort.',
         newSession: { flow: 'CASHOUT', step: 'AWAITING_AMOUNT', data: {} },
       }
@@ -237,7 +238,7 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
 
     let reply = `📤 *Cashout Preview*\n\n`
     reply += `Selling: ${amount} ${assetDisplay}\n`
-    reply += `Rate: 1 USDT = ₦${parseFloat(estimate.rateUsed).toLocaleString()}\n`
+    reply += `Rate: 1 ${assetDisplay} = ₦${parseFloat(estimate.rateUsed).toLocaleString()}\n`
     reply += `Fee: ₦${parseFloat(estimate.feeAmountNgn).toLocaleString()}\n`
     reply += `*You receive: ₦${parseFloat(estimate.ngnAmount).toLocaleString()}*\n\n`
 

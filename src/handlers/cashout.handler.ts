@@ -1,6 +1,7 @@
 import { ZeusPayService } from '../services/zeuspay.service'
 import { IntentService } from '../services/intent.service'
 import { metaService } from '../services/meta.service'
+import { getRedisClient } from '../lib/redis'
 import type { HandlerInput, HandlerOutput, ZeusPayEstimate, ZeusPayTransaction, PreparedCashout } from '../types'
 
 const zeuspay = new ZeusPayService()
@@ -58,6 +59,34 @@ async function openCashoutFlow(params: {
   if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
     try {
       const flowToken = `cashout_${prepared.transactionId}`
+      const ttlSeconds = Math.max(
+        Math.floor((new Date(prepared.expiresAt).getTime() - Date.now()) / 1000),
+        60
+      )
+      const assetDisplay = String(session.data.asset ?? prepared.transactionId)
+        .replace('_ERC20', '')
+        .replace('_TRC20', '')
+        .replace('_BASE', '')
+
+      const redis = getRedisClient()
+      await redis.set(
+        `flow:init:${flowToken}`,
+        JSON.stringify({
+          crypto_amount: prepared.cryptoAmount,
+          asset: assetDisplay,
+          ngn_amount: prepared.ngnAmount,
+          fee: prepared.feeAmount,
+          rate: prepared.rateUsed,
+          bank_name: prepared.bankName,
+          account_last4: prepared.accountLast4,
+          account_name: prepared.accountName,
+          transaction_id: prepared.transactionId,
+          error_message: '',
+          has_error: false,
+        }),
+        'EX',
+        ttlSeconds
+      )
 
       await metaService.sendFlow({
         to: message.from,

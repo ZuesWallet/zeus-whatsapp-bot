@@ -123,22 +123,34 @@ export class IntentService {
       t.includes('withdraw') ||
       t.includes('convert')
     ) {
-      const amountMatch = t.match(/(\d+(?:\.\d+)?)\s*(usdt|usdc|btc|eth|bnb)?/)
+      const amountMatch = t.match(/(\d+(?:\.\d+)?)\s*(usdt|usdc|btc|eth|bnb)?\s*(erc.?20|trc.?20|base|bep.?20)?/)
       const amount = amountMatch ? amountMatch[1] : undefined
       const assetRaw = amountMatch ? amountMatch[2]?.toUpperCase() : undefined
+      const networkRaw = amountMatch ? amountMatch[3]?.toLowerCase() : undefined
+
+      let networkSuffix = ''
+      if (networkRaw) {
+        if (/trc/i.test(networkRaw)) networkSuffix = '_TRC20'
+        else if (/base/i.test(networkRaw)) networkSuffix = '_BASE'
+        else if (/erc/i.test(networkRaw)) networkSuffix = '_ERC20'
+        // bep20 → BNB has no suffix variant
+      }
 
       const assetMap: Record<string, string> = {
         USDT: 'USDT_ERC20',
-        USDC: 'USDC_ERC20',
-        BTC: 'BTC',
-        ETH: 'ETH',
-        BNB: 'BNB',
         USDT_ERC20: 'USDT_ERC20',
         USDT_TRC20: 'USDT_TRC20',
+        USDC: 'USDC_ERC20',
         USDC_ERC20: 'USDC_ERC20',
         USDC_BASE: 'USDC_BASE',
+        BTC: 'BTC',
+        ETH: 'ETH',
+        ETH_ERC20: 'ETH',
+        BNB: 'BNB',
+        BNB_BEP20: 'BNB',
       }
-      const asset = assetRaw ? assetMap[assetRaw] : undefined
+      const assetKey = assetRaw ? `${assetRaw}${networkSuffix}` : undefined
+      const asset = assetKey ? assetMap[assetKey] : undefined
 
       return { type: 'CASHOUT', amount, asset }
     }

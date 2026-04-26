@@ -96,14 +96,18 @@ async function openCashoutFlow(params: {
       const fmtNum = (v: unknown) =>
         parseFloat(String(v ?? '0')).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-      const flowData: Record<string, string> = {
-        selling_text: `Selling: ${prepared.cryptoAmount} ${assetDisplay}`,
-        receive_text: `You receive: ₦${fmtNum(prepared.ngnAmount)}`,
-        fee_text: `Fee: ₦${fmtNum(prepared.feeAmount)}`,
-        rate_text: `Rate: 1 ${assetDisplay} = ₦${fmtNum(prepared.rateUsed)}`,
-        bank_text: `${prepared.bankName} — ••••${prepared.accountLast4}`,
+      const flowData: Record<string, unknown> = {
+        crypto_amount: String(prepared.cryptoAmount ?? ''),
+        asset: assetDisplay,
+        ngn_amount: fmtNum(prepared.ngnAmount),
+        fee: fmtNum(prepared.feeAmount),
+        rate: fmtNum(prepared.rateUsed),
+        bank_name: String(prepared.bankName ?? ''),
+        account_last4: String(prepared.accountLast4 ?? ''),
         account_name: String(prepared.accountName ?? ''),
         transaction_id: String(prepared.transactionId ?? ''),
+        has_error: false,
+        error_message: '',
       }
 
       if (!flowData.transaction_id) {

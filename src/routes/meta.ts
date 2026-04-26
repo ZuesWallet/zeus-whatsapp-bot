@@ -52,13 +52,9 @@ router.post('/', (req: Request, res: Response) => {
           const metadata = value.metadata
 
           for (const message of messages) {
-            if (message.type !== 'text') continue
-
             const from = '+' + message.from
-            const messageBody = message.text?.body || ''
             const messageId = message.id
-
-            if (!from || !messageBody || !messageId) continue
+            if (!from || !messageId) continue
 
             let config
             try {
@@ -72,6 +68,22 @@ router.post('/', (req: Request, res: Response) => {
             const dedupKey = `wa_msgid:${messageId}`
             const inserted = await redis.set(dedupKey, '1', 'EX', 3600, 'NX')
             if (!inserted) continue
+
+            // Flow submission: nfm_reply means user completed the WhatsApp Flow.
+            // The backend already processed the cashout and will send a processing message
+            // via /internal/notify. We just need to clear the AWAITING_FLOW_SENT session.
+            if (message.type === 'interactive' && (message as any).interactive?.type === 'nfm_reply') {
+              const session = await sessions.get(from, config.partnerId)
+              if (session?.step === 'AWAITING_FLOW_SENT') {
+                await sessions.clear(from, config.partnerId)
+              }
+              continue
+            }
+
+            if (message.type !== 'text') continue
+
+            const messageBody = message.text?.body || ''
+            if (!messageBody) continue
 
             const session = await sessions.get(from, config.partnerId)
 

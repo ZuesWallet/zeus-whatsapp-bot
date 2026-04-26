@@ -10,6 +10,8 @@ const sessionSvc = new SessionService()
 
 // Template strings hardcoded for V1 — no DB lookup needed at runtime
 const TEMPLATES: Record<string, string> = {
+  cashout_initiated:
+    '⏳ *Cashout Processing*\n\n₦{{1}} is on its way to your {{2}} account ending in ••••{{3}}.\n\nThis usually takes under 5 minutes. You\'ll receive a receipt here when it\'s done.',
   cashout_completed:
     'Your cashout of {{1}} {{2}} is complete. ₦{{3}} has been sent to your {{4}} account ending in {{5}}. 🎉',
   deposit_confirmed:

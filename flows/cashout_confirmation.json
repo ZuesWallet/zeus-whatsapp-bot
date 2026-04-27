@@ -2,8 +2,8 @@
   "version": "7.3",
   "data_api_version": "3.0",
   "routing_model": {
-    "CONFIRM_CASHOUT": ["SUCCESS"],
-    "SUCCESS": []
+    "CONFIRM_CASHOUT": ["CASHOUT_DONE"],
+    "CASHOUT_DONE": []
   },
   "screens": [
     {
@@ -54,7 +54,7 @@
       }
     },
     {
-      "id": "SUCCESS",
+      "id": "CASHOUT_DONE",
       "title": "Cashout Submitted",
       "terminal": true,
       "success": true,

@@ -42,7 +42,7 @@ export class MetaService {
     flowId: string
     flowCta: string
     screenId: string
-    flowData: Record<string, unknown>
+    flowData: Record<string, string>
     flowToken: string
   }): Promise<void> {
     const to = params.to.replace('whatsapp:', '').replace('+', '')

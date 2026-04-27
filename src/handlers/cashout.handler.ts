@@ -143,6 +143,7 @@ async function openCashoutFlow(params: {
             bankCode,
             accountNumber,
             accountName,
+            bankName: prepared.bankName,
           },
         },
       }

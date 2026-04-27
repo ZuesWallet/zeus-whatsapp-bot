@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express'
 import { RoutingService } from '../services/routing.service'
 import { SessionService } from '../services/session.service'
-import { sendMessage } from '../services/sender.service'
+import { sendMessage, sendMessageWithImage } from '../services/sender.service'
+import { generateReceipt } from '../services/receipt.service'
 import { dispatch } from '../handlers'
 import { getRedisClient } from '../lib/redis'
 import type { InboundMessage } from '../types'
@@ -69,12 +70,48 @@ router.post('/', (req: Request, res: Response) => {
             const inserted = await redis.set(dedupKey, '1', 'EX', 3600, 'NX')
             if (!inserted) continue
 
-            // Flow submission: nfm_reply means user completed the WhatsApp Flow.
-            // The backend already processed the cashout and will send a processing message
-            // via /internal/notify. We just need to clear the AWAITING_FLOW_SENT session.
+            // Flow submission: nfm_reply fires when the user clicks "Done" on the
+            // SUCCESS screen. We send them a "Transaction confirmed" message + receipt.
             if (message.type === 'interactive' && (message as any).interactive?.type === 'nfm_reply') {
               const session = await sessions.get(from, config.partnerId)
               if (session?.step === 'AWAITING_FLOW_SENT') {
+                const d = session.data
+                const est = d.estimate
+                const bankName = d.bankName || ''
+                const last4 = (d.accountNumber || '').slice(-4) || '****'
+                const asset = (d.asset || '').replace('_ERC20', '').replace('_TRC20', '').replace('_BASE', '')
+                const ngnFormatted = parseFloat(String(est?.ngnAmount || '0')).toLocaleString('en-NG', {
+                  minimumFractionDigits: 2, maximumFractionDigits: 2,
+                })
+
+                const confirmText =
+                  `✅ *Transaction Confirmed!*\n\n` +
+                  `₦${ngnFormatted} is on its way to your ${bankName} account ending ••••${last4}.\n\n` +
+                  `This usually takes under 5 minutes. You'll receive a receipt once the transfer is complete.`
+
+                await sendMessage(from, confirmText, config)
+
+                // Generate and send receipt
+                if (d.transactionId && est) {
+                  try {
+                    const receiptBuffer = await generateReceipt({
+                      transactionId: String(d.transactionId),
+                      asset,
+                      cryptoAmount: String(est.cryptoAmount || '0'),
+                      ngnAmount: ngnFormatted,
+                      bankName,
+                      accountNumber: last4,
+                      rate: String(est.rateUsed || '0'),
+                      fee: String(est.feeAmountNgn || '0'),
+                      completedAt: new Date().toISOString(),
+                      botName: config.botName || 'GoGet',
+                    })
+                    await sendMessageWithImage(from, '📄 Your cashout receipt', receiptBuffer, config, '')
+                  } catch (receiptErr) {
+                    console.error('[meta] nfm_reply: receipt generation failed', receiptErr)
+                  }
+                }
+
                 await sessions.clear(from, config.partnerId)
               }
               continue

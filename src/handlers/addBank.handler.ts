@@ -31,7 +31,7 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
       }
     }
 
-    const bankRows = banks.map(b => ({ id: b.code, title: b.name }))
+    const bankRows = prioritiseBanks(banks).map(b => ({ id: b.code, title: b.name }))
     const safePhone = message.from.replace(/\+/g, '')
     const flowToken = `addbank_${safePhone}_${Date.now()}`
     const redis = getRedisClient()
@@ -302,4 +302,68 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
     reply: 'Type *help* for available commands.',
     newSession: { flow: null, step: null, data: {} },
   }
+}
+
+// WhatsApp Flows Dropdown max is 200 items.
+// Sort priority banks to the top so common Nigerian banks are always visible,
+// then fill the rest alphabetically up to the limit.
+const PRIORITY_BANK_CODES = new Set([
+  '044', // Access Bank
+  '063', // Access Bank (Diamond)
+  '050', // Ecobank
+  '070', // Fidelity Bank
+  '011', // First Bank
+  '214', // FCMB
+  '058', // GTBank
+  '030', // Heritage Bank
+  '301', // Jaiz Bank
+  '082', // Keystone Bank
+  '014', // MainStreet Bank
+  '076', // Polaris Bank
+  '101', // ProvidusBank
+  '221', // Stanbic IBTC
+  '068', // Standard Chartered
+  '232', // Sterling Bank
+  '100', // Suntrust Bank
+  '033', // UBA
+  '032', // Union Bank
+  '035', // Wema Bank
+  '057', // Zenith Bank
+  '090267', // Kuda
+  '999992', // OPay
+  '999991', // PalmPay
+  '50515',  // Moniepoint
+  '090405', // Opay (alt)
+  '090175', // Lagos Building Investment Company / One Finance
+  '090003', // Jubilee Life
+  '000023', // Lotus Bank
+  '000026', // Taj Bank
+  '090006', // ALAT by Wema
+  '090177', // Fina Trust Microfinance
+  '090115', // TCF MFB
+  '000027', // Globus Bank
+  '090270', // AB Microfinance
+  '120001', // 9PSB
+  '090281', // Boctrust Microfinance
+  '090166', // Daylight Microfinance
+  '090195', // Grooming Microfinance
+])
+
+function prioritiseBanks(banks: { code: string; name: string }[]): { code: string; name: string }[] {
+  const priority: typeof banks = []
+  const rest: typeof banks = []
+
+  for (const bank of banks) {
+    if (PRIORITY_BANK_CODES.has(bank.code)) {
+      priority.push(bank)
+    } else {
+      rest.push(bank)
+    }
+  }
+
+  // Sort each group alphabetically by name
+  priority.sort((a, b) => a.name.localeCompare(b.name))
+  rest.sort((a, b) => a.name.localeCompare(b.name))
+
+  return [...priority, ...rest].slice(0, 200)
 }

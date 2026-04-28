@@ -7,6 +7,14 @@ import type { HandlerInput, HandlerOutput } from '../types'
 const zeuspay = new ZeusPayService()
 const intentSvc = new IntentService()
 
+type BankAccount = {
+  id: string
+  bankName: string
+  accountNumber: string
+  accountName: string
+  bankCode: string
+}
+
 export async function withdrawHandler(input: HandlerInput): Promise<HandlerOutput> {
   const { message, session, config } = input
   const intent = intentSvc.parse(message.body)
@@ -18,62 +26,38 @@ export async function withdrawHandler(input: HandlerInput): Promise<HandlerOutpu
     }
   }
 
-  // ── ENTRY — Currency selection via reply buttons ──────────────────────────
-  if (!session.step || session.step === 'AWAITING_CURRENCY') {
-    if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
-      await metaService.sendButtons({
-        to: message.from,
-        phoneNumberId: config.metaCredentials.phoneNumberId,
-        accessToken: config.metaCredentials.accessToken,
-        header: '💸 Sell Crypto',
-        body: 'Which currency would you like to receive?',
-        buttons: [
-          { id: 'currency_NGN', title: '🇳🇬 NGN — Naira' },
-        ],
-        footer: 'More currencies coming soon',
-      })
-
-      return {
-        reply: '',
-        newSession: {
-          flow: 'WITHDRAW',
-          step: 'AWAITING_CURRENCY',
-          data: {},
-        },
-      }
-    }
-
-    // Twilio fallback
-    return {
-      reply:
-        '💸 *Sell Crypto*\n\n' +
-        'Which currency would you like to receive?\n\n' +
-        '1. NGN (Nigerian Naira)\n\n' +
-        '_Reply with 1_',
-      newSession: { flow: 'WITHDRAW', step: 'AWAITING_CURRENCY_TEXT', data: {} },
-    }
+  // ── ENTRY — no active step yet, show currency list ────────────────────────
+  // Only matches when step is null/undefined — NOT when step === 'AWAITING_CURRENCY'
+  if (!session.step) {
+    return sendCurrencyList(input)
   }
 
-  // ── AWAITING_CURRENCY — handle currency button reply ─────────────────────
+  // ── AWAITING_CURRENCY — user selected from the currency list ─────────────
   if (session.step === 'AWAITING_CURRENCY') {
-    const currency = message.body === 'currency_NGN' ? 'NGN' : null
+    // list_reply id will be e.g. "currency_NGN"
+    const currency = message.body.startsWith('currency_')
+      ? message.body.replace('currency_', '')
+      : null
+
     if (!currency) {
       return {
-        reply: 'Please tap the currency button above to continue.',
+        reply: 'Please tap *Select Currency* above and choose a currency.',
         newSession: session,
       }
     }
-    return sendBankSelectionButtons(input, currency)
+
+    return sendBankList(input, currency)
   }
 
   // Twilio fallback currency text
   if (session.step === 'AWAITING_CURRENCY_TEXT') {
-    return sendBankSelectionButtons(input, 'NGN')
+    return sendBankList(input, 'NGN')
   }
 
-  // ── AWAITING_BANK_CHOICE — handle Choose Existing / Add New ──────────────
-  if (session.step === 'AWAITING_BANK_CHOICE') {
+  // ── AWAITING_BANK — user selected from the bank list ─────────────────────
+  if (session.step === 'AWAITING_BANK') {
     const currency = (session.data as any).currency as string
+    const bankAccounts = (session.data as any).bankAccounts as BankAccount[]
 
     if (message.body === 'bank_add_new') {
       return {
@@ -82,91 +66,48 @@ export async function withdrawHandler(input: HandlerInput): Promise<HandlerOutpu
       }
     }
 
-    if (message.body === 'bank_choose_existing') {
-      return sendBankAccountList(input, currency)
-    }
-
-    return {
-      reply: 'Please tap a button above to continue.',
-      newSession: session,
-    }
-  }
-
-  // Twilio fallback bank choice text
-  if (session.step === 'AWAITING_BANK_CHOICE_TEXT') {
-    const currency = (session.data as any).currency as string
-    if (message.body === '1') return sendBankAccountList(input, currency)
-    if (message.body === '2') {
-      return {
-        reply: '🏦 Let\'s add a new bank account.',
-        newSession: { flow: 'ADD_BANK', step: null, data: { returnTo: 'WITHDRAW', currency } as any },
-      }
-    }
-    return {
-      reply: 'Please reply with 1 (existing) or 2 (add new).',
-      newSession: session,
-    }
-  }
-
-  // ── AWAITING_BANK_SELECT — handle list reply (bank account selected) ──────
-  if (session.step === 'AWAITING_BANK_SELECT') {
-    const currency = (session.data as any).currency as string
-    const bankAccounts = (session.data as any).bankAccounts as Array<{
-      id: string
-      bankName: string
-      accountNumber: string
-      accountName: string
-      bankCode: string
-    }>
-
-    const selectedIndex = parseInt(message.body.replace('bank_', ''), 10)
-    const selectedBank = !isNaN(selectedIndex) ? bankAccounts[selectedIndex] : undefined
+    const idx = parseInt(message.body.replace('bank_', ''), 10)
+    const selectedBank = !isNaN(idx) ? bankAccounts[idx] : undefined
 
     if (!selectedBank) {
       return {
-        reply: 'Please select a bank account from the list above.',
+        reply: 'Please tap *View Accounts* above and select a bank account.',
         newSession: session,
       }
     }
 
-    return startCashoutPrompt(input, selectedBank, currency)
+    return sendProceedButton(input, selectedBank, currency)
   }
 
   // Twilio fallback bank text select
   if (session.step === 'AWAITING_BANK_TEXT_SELECT') {
     const currency = (session.data as any).currency as string
-    const bankAccounts = (session.data as any).bankAccounts as Array<{
-      id: string
-      bankName: string
-      accountNumber: string
-      accountName: string
-      bankCode: string
-    }>
+    const bankAccounts = (session.data as any).bankAccounts as BankAccount[]
 
-    const selectedIndex = parseInt(message.body, 10) - 1
-    const selectedBank = !isNaN(selectedIndex) ? bankAccounts[selectedIndex] : undefined
-
-    if (!selectedBank) {
+    if (message.body === String(bankAccounts.length + 1)) {
       return {
-        reply: 'Please reply with a valid number.',
-        newSession: session,
+        reply: '🏦 Let\'s add a new bank account.',
+        newSession: { flow: 'ADD_BANK', step: null, data: { returnTo: 'WITHDRAW', currency } as any },
       }
     }
 
-    return startCashoutPrompt(input, selectedBank, currency)
+    const idx = parseInt(message.body, 10) - 1
+    const selectedBank = !isNaN(idx) ? bankAccounts[idx] : undefined
+
+    if (!selectedBank) {
+      return { reply: 'Please reply with a valid number.', newSession: session }
+    }
+
+    return sendProceedButton(input, selectedBank, currency)
   }
 
-  // ── AWAITING_PROCEED — user tapped Proceed button ────────────────────────
+  // ── AWAITING_PROCEED — user tapped Proceed ────────────────────────────────
   if (session.step === 'AWAITING_PROCEED') {
     if (message.body === 'proceed_cashout') {
-      const bank = (session.data as any).bank as {
-        bankCode: string
-        accountNumber: string
-        accountName: string
-      }
+      const bank = (session.data as any).bank as BankAccount
 
       return {
-        reply: '💸 *How much would you like to sell?*\n\n_Reply with the amount e.g. 100_',
+        reply: '💸 *How much would you like to sell?*\n\n_Reply with the amount, e.g. 100_',
         newSession: {
           flow: 'CASHOUT',
           step: 'AWAITING_AMOUNT',
@@ -179,16 +120,9 @@ export async function withdrawHandler(input: HandlerInput): Promise<HandlerOutpu
         },
       }
     }
-    return {
-      reply: 'Please tap Proceed above to continue.',
-      newSession: session,
-    }
-  }
 
-  // ── AWAITING_CASHOUT_FLOW ─────────────────────────────────────────────────
-  if (session.step === 'AWAITING_CASHOUT_FLOW') {
     return {
-      reply: '📱 Please complete your transaction in the secure screen above.',
+      reply: 'Please tap *Proceed* above to continue.',
       newSession: session,
     }
   }
@@ -199,97 +133,85 @@ export async function withdrawHandler(input: HandlerInput): Promise<HandlerOutpu
   }
 }
 
-// ── Send bank selection buttons (Choose Existing / Add New) ──────────────────
+// ── Currency list ─────────────────────────────────────────────────────────────
 
-async function sendBankSelectionButtons(
-  input: HandlerInput,
-  currency: string
-): Promise<HandlerOutput> {
+async function sendCurrencyList(input: HandlerInput): Promise<HandlerOutput> {
   const { message, config } = input
-
-  if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
-    await metaService.sendButtons({
-      to: message.from,
-      phoneNumberId: config.metaCredentials.phoneNumberId,
-      accessToken: config.metaCredentials.accessToken,
-      body: 'Do you want to choose an existing bank account or add a new one?',
-      buttons: [
-        { id: 'bank_choose_existing', title: 'Choose Existing' },
-        { id: 'bank_add_new', title: 'Add New' },
-      ],
-    })
-
-    return {
-      reply: '',
-      newSession: {
-        flow: 'WITHDRAW',
-        step: 'AWAITING_BANK_CHOICE',
-        data: { currency } as any,
-      },
-    }
-  }
-
-  return {
-    reply:
-      '🏦 *Bank Account*\n\n' +
-      'Do you want to use an existing bank account or add a new one?\n\n' +
-      '1. Choose existing\n' +
-      '2. Add new\n\n' +
-      '_Reply with 1 or 2_',
-    newSession: {
-      flow: 'WITHDRAW',
-      step: 'AWAITING_BANK_CHOICE_TEXT',
-      data: { currency } as any,
-    },
-  }
-}
-
-// ── Send existing bank accounts as list message ───────────────────────────────
-
-async function sendBankAccountList(
-  input: HandlerInput,
-  currency: string
-): Promise<HandlerOutput> {
-  const { message, config } = input
-
-  let bankAccounts: Array<{
-    id: string
-    bankName: string
-    accountNumber: string
-    accountName: string
-    bankCode: string
-  }> = []
-
-  try {
-    bankAccounts = await zeuspay.getBankAccounts(message.from, config.partnerApiKey)
-  } catch {}
-
-  if (bankAccounts.length === 0) {
-    return {
-      reply:
-        '🏦 You have no saved bank accounts.\n\n' +
-        'Type /addbank to add one first.',
-      newSession: { flow: null, step: null, data: {} },
-    }
-  }
 
   if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
     await metaService.sendList({
       to: message.from,
       phoneNumberId: config.metaCredentials.phoneNumberId,
       accessToken: config.metaCredentials.accessToken,
-      body: 'Select a bank account to receive your funds:',
-      buttonText: 'View accounts',
+      header: '💸 Sell Crypto',
+      body: 'Which currency would you like to receive?',
+      buttonText: 'Select Currency',
       sections: [
         {
-          title: 'Your bank accounts',
-          rows: bankAccounts.slice(0, 10).map((acc, i) => ({
-            id: `bank_${i}`,
-            title: `${acc.bankName}`.slice(0, 24),
-            description: `${acc.accountName} — ••••${acc.accountNumber.slice(-4)}`,
-          })),
+          title: 'Available Currencies',
+          rows: [
+            {
+              id: 'currency_NGN',
+              title: '🇳🇬 Nigerian Naira',
+              description: 'NGN — Receive naira in your bank account',
+            },
+          ],
         },
       ],
+      footer: 'More currencies coming soon',
+    })
+
+    return {
+      reply: '',
+      newSession: { flow: 'WITHDRAW', step: 'AWAITING_CURRENCY', data: {} },
+    }
+  }
+
+  // Twilio fallback
+  return {
+    reply:
+      '💸 *Sell Crypto*\n\n' +
+      'Which currency would you like to receive?\n\n' +
+      '1. NGN (Nigerian Naira)\n\n' +
+      '_Reply with 1_',
+    newSession: { flow: 'WITHDRAW', step: 'AWAITING_CURRENCY_TEXT', data: {} },
+  }
+}
+
+// ── Bank account list (accounts + Add New as last row) ────────────────────────
+
+async function sendBankList(input: HandlerInput, currency: string): Promise<HandlerOutput> {
+  const { message, config } = input
+
+  let bankAccounts: BankAccount[] = []
+  try {
+    bankAccounts = await zeuspay.getBankAccounts(message.from, config.partnerApiKey)
+  } catch {}
+
+  if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
+    const accountRows = bankAccounts.slice(0, 9).map((acc, i) => ({
+      id: `bank_${i}`,
+      title: acc.bankName.slice(0, 24),
+      description: `${acc.accountName} — ••••${acc.accountNumber.slice(-4)}`,
+    }))
+
+    const rows = [
+      ...accountRows,
+      {
+        id: 'bank_add_new',
+        title: '➕ Add New Account',
+        description: 'Link a new bank account',
+      },
+    ]
+
+    await metaService.sendList({
+      to: message.from,
+      phoneNumberId: config.metaCredentials.phoneNumberId,
+      accessToken: config.metaCredentials.accessToken,
+      header: '🏦 Bank Account',
+      body: `Where should we send your ${currency}?`,
+      buttonText: 'View Accounts',
+      sections: [{ title: 'Your bank accounts', rows }],
       footer: 'Tap an account to select it',
     })
 
@@ -297,18 +219,18 @@ async function sendBankAccountList(
       reply: '',
       newSession: {
         flow: 'WITHDRAW',
-        step: 'AWAITING_BANK_SELECT',
-        data: { currency, bankAccounts: bankAccounts.slice(0, 10) } as any,
+        step: 'AWAITING_BANK',
+        data: { currency, bankAccounts: bankAccounts.slice(0, 9) } as any,
       },
     }
   }
 
   // Twilio fallback
-  let reply = '🏦 *Select Bank Account*\n\n'
+  let reply = `🏦 *Select Bank Account*\n\nWhere should we send your ${currency}?\n\n`
   bankAccounts.slice(0, 5).forEach((acc, i) => {
     reply += `${i + 1}. ${acc.bankName} — ••••${acc.accountNumber.slice(-4)}\n`
   })
-  reply += '\n_Reply with a number_'
+  reply += `${bankAccounts.slice(0, 5).length + 1}. ➕ Add new bank\n\n_Reply with a number_`
 
   return {
     reply,
@@ -320,11 +242,11 @@ async function sendBankAccountList(
   }
 }
 
-// ── Show Proceed prompt after bank is selected ────────────────────────────────
+// ── Proceed button after bank selected ───────────────────────────────────────
 
-async function startCashoutPrompt(
+async function sendProceedButton(
   input: HandlerInput,
-  bank: { id: string; bankName: string; accountNumber: string; accountName: string; bankCode: string },
+  bank: BankAccount,
   currency: string
 ): Promise<HandlerOutput> {
   const { message, config } = input
@@ -342,12 +264,8 @@ async function startCashoutPrompt(
       to: message.from,
       phoneNumberId: config.metaCredentials.phoneNumberId,
       accessToken: config.metaCredentials.accessToken,
-      body:
-        `To sell crypto for 🇳🇬 NGN, tap "Proceed" to enter ` +
-        `the amount you want to sell.`,
-      buttons: [
-        { id: 'proceed_cashout', title: 'Proceed' },
-      ],
+      body: `Tap *Proceed* to enter the amount you want to sell.`,
+      buttons: [{ id: 'proceed_cashout', title: 'Proceed' }],
       footer: `Sending to: ${bank.bankName} ••••${bank.accountNumber.slice(-4)}`,
     })
 
@@ -361,7 +279,7 @@ async function startCashoutPrompt(
     }
   }
 
-  // Twilio fallback — jump straight to cashout amount
+  // Twilio fallback
   return {
     reply: 'How much would you like to sell? (e.g. 100)',
     newSession: {

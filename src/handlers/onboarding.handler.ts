@@ -68,7 +68,6 @@ export async function handleOnboarding(
           screenId: 'SET_PIN',
           flowData: { user_name: firstName },
           flowToken,
-          mode: 'draft',
         })
       } catch (flowErr) {
         console.error('[onboarding] sendFlow failed — falling back to /setpin prompt', flowErr)

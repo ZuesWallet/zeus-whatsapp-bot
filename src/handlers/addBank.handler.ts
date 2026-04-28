@@ -53,6 +53,7 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
         screenId: '',
         flowData: {},
         flowToken,
+        bodyText: 'Tap the button below to add your bank account.',
       })
     } catch (err) {
       console.error('[addBank] sendFlow failed', err)

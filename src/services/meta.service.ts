@@ -44,6 +44,7 @@ export class MetaService {
     screenId: string
     flowData: Record<string, string>
     flowToken: string
+    bodyText?: string
     mode?: 'draft' | 'published'
   }): Promise<void> {
     const to = params.to.replace('whatsapp:', '').replace('+', '')
@@ -73,9 +74,9 @@ export class MetaService {
       }
     }
 
-    const bodyText = hasInitData
+    const bodyText = params.bodyText ?? (hasInitData
       ? 'Tap the button below to continue.'
-      : 'Review your transaction details and enter your PIN to confirm.'
+      : 'Review your transaction details and enter your PIN to confirm.')
 
     const payload = {
       messaging_product: 'whatsapp',

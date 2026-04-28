@@ -17,9 +17,9 @@ export async function handleOnboarding(
   const onboardedKey = `onboarded:${message.from}:${config.partnerId}`
   const isOnboarded = await redis.get(onboardedKey)
 
+  // Skip for non-forced messages if already onboarded.
+  // PIN-less users never get this key set, so they always see the PIN prompt.
   if (isOnboarded && !force) return null
-
-  await redis.set(onboardedKey, '1')
 
   let profile: Awaited<ReturnType<typeof zeuspay.getUserProfile>>
   try {
@@ -55,17 +55,30 @@ export async function handleOnboarding(
 
       await new Promise(r => setTimeout(r, 1000))
 
-      await metaService.sendFlow({
-        to: message.from,
-        phoneNumberId: config.metaCredentials.phoneNumberId,
-        accessToken: config.metaCredentials.accessToken,
-        flowId: process.env.META_SET_PIN_FLOW_ID!,
-        flowCta: 'Set Up PIN',
-        screenId: 'SET_PIN',
-        flowData: { user_name: firstName },
-        flowToken,
-        mode: 'draft',
-      })
+      // Wrap sendFlow — if the Flow ID isn't configured yet, send a text fallback
+      // so the welcome message doesn't hang without a follow-up.
+      try {
+        await metaService.sendFlow({
+          to: message.from,
+          phoneNumberId: config.metaCredentials.phoneNumberId,
+          accessToken: config.metaCredentials.accessToken,
+          flowId: process.env.META_SET_PIN_FLOW_ID!,
+          flowCta: 'Set Up PIN',
+          screenId: 'SET_PIN',
+          flowData: { user_name: firstName },
+          flowToken,
+          mode: 'draft',
+        })
+      } catch (flowErr) {
+        console.error('[onboarding] sendFlow failed — falling back to /setpin prompt', flowErr)
+        await metaService.send({
+          to: message.from,
+          from: config.metaCredentials.phoneNumberId,
+          body: 'Type */setpin* to create your 6-digit transaction PIN.',
+          accessToken: config.metaCredentials.accessToken,
+          phoneNumberId: config.metaCredentials.phoneNumberId,
+        })
+      }
 
       return {
         reply: '',
@@ -87,7 +100,9 @@ export async function handleOnboarding(
     }
   }
 
-  // Returning user with PIN — welcome back + help guide
+  // Returning user with PIN set — mark as onboarded so future messages skip this check
+  await redis.set(onboardedKey, '1')
+
   if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
     await metaService.send({
       to: message.from,

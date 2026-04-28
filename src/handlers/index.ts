@@ -30,7 +30,9 @@ export async function dispatch(
     const onboardingResult = await handleOnboarding(input, forceOnboarding)
     if (onboardingResult !== null) return onboardingResult
   } catch {
-    // Onboarding check failed — continue to normal routing
+    // If onboarding was forced (greeting or welcome request) and threw, don't fall
+    // through to helpHandler — the welcome text may have already been sent.
+    if (forceOnboarding) return { reply: '' }
   }
 
   // ── Active flow — route to flow handler regardless of intent (CANCEL handled inside) ──

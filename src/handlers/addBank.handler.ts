@@ -351,10 +351,18 @@ const PRIORITY_BANK_CODES = new Set([
 ])
 
 function prioritiseBanks(banks: { code: string; name: string }[]): { code: string; name: string }[] {
-  const priority: typeof banks = []
-  const rest: typeof banks = []
+  // Deduplicate by code — Paystack returns duplicate codes for some banks
+  const seen = new Set<string>()
+  const unique = banks.filter(b => {
+    if (seen.has(b.code)) return false
+    seen.add(b.code)
+    return true
+  })
 
-  for (const bank of banks) {
+  const priority: typeof unique = []
+  const rest: typeof unique = []
+
+  for (const bank of unique) {
     if (PRIORITY_BANK_CODES.has(bank.code)) {
       priority.push(bank)
     } else {
@@ -362,7 +370,6 @@ function prioritiseBanks(banks: { code: string; name: string }[]): { code: strin
     }
   }
 
-  // Sort each group alphabetically by name
   priority.sort((a, b) => a.name.localeCompare(b.name))
   rest.sort((a, b) => a.name.localeCompare(b.name))
 

@@ -94,17 +94,30 @@ export class MetaService {
 
     console.log('[metaService.sendFlow] payload:', JSON.stringify(payload, null, 2))
 
-    await axios.post(
-      `${META_API_BASE}/${params.phoneNumberId}/messages`,
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${params.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 15000,
+    try {
+      await axios.post(
+        `${META_API_BASE}/${params.phoneNumberId}/messages`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${params.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 15000,
+        }
+      )
+    } catch (err: any) {
+      // Re-throw with the actual Meta error message attached so callers can log it clearly
+      const metaError = err?.response?.data?.error
+      if (metaError) {
+        const enhanced = new Error(
+          `Meta sendFlow ${metaError.code ?? ''} (${metaError.error_subcode ?? ''}): ${metaError.message ?? JSON.stringify(metaError)}`
+        )
+        ;(enhanced as any).metaError = metaError
+        throw enhanced
       }
-    )
+      throw err
+    }
   }
 
   async sendImage(params: {

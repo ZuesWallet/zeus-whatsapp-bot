@@ -33,7 +33,8 @@ export async function handleOnboarding(
 
   if (!profile.hasPinSet) {
     if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
-      const flowToken = `setpin_${message.from}_${Date.now()}`
+      const safePhone = message.from.replace(/\+/g, '')
+      const flowToken = `setpin_${safePhone}_${Date.now()}`
 
       await redis.set(
         `flow:setpin:${flowToken}`,

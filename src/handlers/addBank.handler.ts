@@ -1,5 +1,7 @@
 import { ZeusPayService } from '../services/zeuspay.service'
 import { IntentService } from '../services/intent.service'
+import { metaService } from '../services/meta.service'
+import { getRedisClient } from '../lib/redis'
 import { matchBanks } from '../lib/bankMatch'
 import type { HandlerInput, HandlerOutput } from '../types'
 
@@ -14,6 +16,69 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
     return {
       reply: '❌ Cancelled. Type *help* for options.',
       newSession: { flow: null, step: null, data: {} },
+    }
+  }
+
+  // ── META_CLOUD entry — send the Add Bank Flow ─────────────────────────────
+  if (!session.step && config.bspType === 'META_CLOUD' && config.metaCredentials) {
+    let banks: { code: string; name: string }[] = []
+    try {
+      banks = await zeuspay.getBanks(config.partnerApiKey)
+    } catch {
+      return {
+        reply: '⚠️ Could not load bank list right now. Please try again.',
+        newSession: { flow: null, step: null, data: {} },
+      }
+    }
+
+    const bankRows = banks.map(b => ({ id: b.code, title: b.name }))
+    const safePhone = message.from.replace(/\+/g, '')
+    const flowToken = `addbank_${safePhone}_${Date.now()}`
+    const redis = getRedisClient()
+
+    await redis.set(
+      `flow:addbank:${flowToken}`,
+      JSON.stringify({ phone: message.from, partnerId: config.partnerId, banks: bankRows }),
+      'EX',
+      600
+    )
+
+    try {
+      await metaService.sendFlow({
+        to: message.from,
+        phoneNumberId: config.metaCredentials.phoneNumberId,
+        accessToken: config.metaCredentials.accessToken,
+        flowId: process.env.META_ADD_BANK_FLOW_ID!,
+        flowCta: 'Add Bank Account',
+        screenId: '',
+        flowData: {},
+        flowToken,
+      })
+    } catch (err) {
+      console.error('[addBank] sendFlow failed', err)
+      // Fall through to text-based flow below by clearing session and retrying
+      await redis.del(`flow:addbank:${flowToken}`)
+      return {
+        reply:
+          '🏦 *Add Bank Account*\n\n' +
+          'What is the name of your bank?\n\n' +
+          '_e.g. GTBank, Access Bank, Zenith, UBA_\n\n' +
+          'Type *cancel* to abort.',
+        newSession: { flow: 'ADD_BANK', step: 'AWAITING_BANK_NAME', data: {} },
+      }
+    }
+
+    return {
+      reply: '',
+      newSession: { flow: 'ADD_BANK', step: 'AWAITING_FLOW', data: {} },
+    }
+  }
+
+  // ── AWAITING_FLOW — waiting for Flow completion (Meta only) ───────────────
+  if (session.step === 'AWAITING_FLOW') {
+    return {
+      reply: '📱 Please complete the bank account form in the screen above.',
+      newSession: session,
     }
   }
 

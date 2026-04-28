@@ -1,0 +1,124 @@
+{
+  "version": "7.3",
+  "data_api_version": "4.0",
+  "routing_model": {
+    "ADD_BANK_DETAILS": ["CONFIRM_BANK"],
+    "CONFIRM_BANK": ["BANK_ADDED"],
+    "BANK_ADDED": []
+  },
+  "screens": [
+    {
+      "id": "ADD_BANK_DETAILS",
+      "title": "Add Bank Account",
+      "data": {
+        "banks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          },
+          "__example__": [
+            { "id": "044", "title": "Access Bank" },
+            { "id": "058", "title": "GTBank" }
+          ]
+        },
+        "error_message": { "type": "string", "__example__": "" },
+        "has_error": { "type": "boolean", "__example__": false }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Add Bank Account" },
+          { "type": "TextBody", "text": "Enter your account details below." },
+          {
+            "type": "TextInput",
+            "label": "Account Number",
+            "name": "account_number",
+            "input-type": "number",
+            "required": true,
+            "min-chars": 10,
+            "max-chars": 10,
+            "helper-text": "Enter your 10-digit account number"
+          },
+          {
+            "type": "Dropdown",
+            "label": "Select Bank",
+            "name": "bank_code",
+            "required": true,
+            "data-source": "${data.banks}"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.error_message}",
+            "visible": "${data.has_error}"
+          },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "account_number": "${form.account_number}",
+                "bank_code": "${form.bank_code}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CONFIRM_BANK",
+      "title": "Confirm Account",
+      "data": {
+        "account_number": { "type": "string", "__example__": "0123456789" },
+        "bank_name":      { "type": "string", "__example__": "Access Bank" },
+        "bank_code":      { "type": "string", "__example__": "044" },
+        "account_name":   { "type": "string", "__example__": "JOHN DOE" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Confirm Account" },
+          { "type": "TextBody", "text": "Please verify your bank account details before saving:" },
+          { "type": "TextSubheading", "text": "${data.bank_name}" },
+          { "type": "TextBody", "text": "Account Number: ${data.account_number}" },
+          { "type": "TextBody", "text": "Account Name: ${data.account_name}" },
+          {
+            "type": "Footer",
+            "label": "Add Bank Account",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "account_number": "${data.account_number}",
+                "bank_code":      "${data.bank_code}",
+                "account_name":   "${data.account_name}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "BANK_ADDED",
+      "title": "Bank Account Added",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Bank Account Added! 🎉" },
+          { "type": "TextBody", "text": "Your bank account has been saved. You can now sell crypto directly to this account." },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": { "name": "complete", "payload": {} }
+          }
+        ]
+      }
+    }
+  ]
+}

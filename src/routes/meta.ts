@@ -150,6 +150,23 @@ router.post('/', (req: Request, res: Response) => {
                 continue
               }
 
+              // Add-bank Flow completed
+              if (flowToken.startsWith('addbank_')) {
+                if (config.metaCredentials) {
+                  await metaService.send({
+                    to: from,
+                    from: metadata.phone_number_id,
+                    body:
+                      '🏦 *Bank account added!*\n\n' +
+                      'Your account has been saved. You can now tap /withdraw to sell crypto.',
+                    accessToken: config.metaCredentials.accessToken,
+                    phoneNumberId: config.metaCredentials.phoneNumberId,
+                  })
+                }
+                await sessions.clear(from, config.partnerId)
+                continue
+              }
+
               // Cashout Flow completed — existing behaviour
               const session = await sessions.get(from, config.partnerId)
               if (session?.step === 'AWAITING_FLOW_SENT') {

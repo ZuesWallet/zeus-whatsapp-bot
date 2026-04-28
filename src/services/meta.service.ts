@@ -93,7 +93,7 @@ export class MetaService {
       },
     }
 
-    console.log('[metaService.sendFlow] payload:', JSON.stringify(payload, null, 2))
+    console.log('[metaService.sendFlow] sending flow', { to, flowId: params.flowId, flowAction, flowToken: params.flowToken })
 
     try {
       await axios.post(

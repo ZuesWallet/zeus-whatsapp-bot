@@ -42,7 +42,7 @@ export class MetaService {
     flowId: string
     flowCta: string
     screenId: string
-    flowData: Record<string, string>
+    flowData: Record<string, unknown>
     flowToken: string
     bodyText?: string
     mode?: 'draft' | 'published'

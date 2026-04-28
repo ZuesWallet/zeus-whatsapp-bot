@@ -36,9 +36,10 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
     const flowToken = `addbank_${safePhone}_${Date.now()}`
     const redis = getRedisClient()
 
+    // Cache phone + partnerId only — banks are embedded in the flow message (navigate mode)
     await redis.set(
       `flow:addbank:${flowToken}`,
-      JSON.stringify({ phone: message.from, partnerId: config.partnerId, banks: bankRows }),
+      JSON.stringify({ phone: message.from, partnerId: config.partnerId }),
       'EX',
       600
     )
@@ -50,8 +51,8 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
         accessToken: config.metaCredentials.accessToken,
         flowId: process.env.META_ADD_BANK_FLOW_ID!,
         flowCta: 'Add Bank Account',
-        screenId: '',
-        flowData: {},
+        screenId: 'ADD_BANK_DETAILS',
+        flowData: { banks: bankRows, error_message: '', has_error: false },
         flowToken,
         bodyText: 'Tap the button below to add your bank account.',
       })

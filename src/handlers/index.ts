@@ -8,6 +8,8 @@ import { historyHandler } from './history.handler'
 import { cashoutHandler } from './cashout.handler'
 import { addBankHandler } from './addBank.handler'
 import { setPinHandler, changePinHandler, forgotPinHandler } from './setPin.handler'
+import { handleOnboarding } from './onboarding.handler'
+import { withdrawHandler } from './withdraw.handler'
 import type { InboundMessage, Session, PartnerConfig, HandlerOutput, WACommand } from '../types'
 
 const intentSvc = new IntentService()
@@ -20,7 +22,18 @@ export async function dispatch(
   const input = { message, session, config }
   const intent = intentSvc.parse(message.body)
 
-  // Active flow — route to flow handler regardless of intent (CANCEL handled inside)
+  // ── Onboarding check ──────────────────────────────────────────────────────
+  // Force onboarding for ONBOARDING intent (ice breaker "Hi 👋" or greeting).
+  // Also runs silently for every new user's first message.
+  const forceOnboarding = intent.type === 'ONBOARDING' || !!message.isWelcomeRequest
+  try {
+    const onboardingResult = await handleOnboarding(input, forceOnboarding)
+    if (onboardingResult !== null) return onboardingResult
+  } catch {
+    // Onboarding check failed — continue to normal routing
+  }
+
+  // ── Active flow — route to flow handler regardless of intent (CANCEL handled inside) ──
   if (session.flow === 'CASHOUT') {
     return cashoutHandler(input)
   }
@@ -41,18 +54,36 @@ export async function dispatch(
     return forgotPinHandler(input)
   }
 
-  // No active flow — check if command is enabled
+  if (session.flow === 'WITHDRAW') {
+    return withdrawHandler(input)
+  }
+
+  if (session.flow === 'ONBOARDING_PIN') {
+    if (intent.type === 'CANCEL') {
+      return {
+        reply: '❌ PIN setup cancelled. Type /setpin to set it up later.',
+        newSession: { flow: null, step: null, data: {} },
+      }
+    }
+    return {
+      reply: '📱 Please complete your PIN setup in the secure screen above.',
+      newSession: session,
+    }
+  }
+
+  // ── No active flow — check if command is enabled ──────────────────────────
   const commandToFeature: Record<string, WACommand> = {
-    RATE:     'RATE',
-    BALANCE:  'BALANCE',
-    WALLET:   'WALLET',
-    CASHOUT:  'CASHOUT',
-    HISTORY:  'HISTORY',
-    ADD_BANK: 'ADD_BANK',
+    RATE:       'RATE',
+    BALANCE:    'BALANCE',
+    WALLET:     'WALLET',
+    CASHOUT:    'CASHOUT',
+    HISTORY:    'HISTORY',
+    ADD_BANK:   'ADD_BANK',
     SET_PIN:    'SET_PIN',
-    CHANGE_PIN: 'SET_PIN',  // same feature gate as SET_PIN
+    CHANGE_PIN: 'SET_PIN',
     FORGOT_PIN: 'SET_PIN',
     HELP:       'HELP',
+    ONBOARDING: 'HELP',
   }
 
   const requiredFeature = commandToFeature[intent.type]
@@ -65,11 +96,15 @@ export async function dispatch(
   }
 
   switch (intent.type) {
+    case 'ONBOARDING':
+      // Already handled above via forceOnboarding — if we reach here the user
+      // is already onboarded, so show the help guide
+      return helpHandler(input)
     case 'RATE':        return rateHandler(input)
     case 'BALANCE':     return balanceHandler(input)
     case 'WALLET':      return walletHandler(input)
     case 'HISTORY':     return historyHandler(input)
-    case 'CASHOUT':     return cashoutHandler(input)
+    case 'CASHOUT':     return withdrawHandler(input)
     case 'ADD_BANK':    return addBankHandler(input)
     case 'SET_PIN':     return setPinHandler(input)
     case 'CHANGE_PIN':  return changePinHandler(input)
@@ -88,7 +123,6 @@ export async function dispatch(
       }
     case 'UNKNOWN':
     default: {
-      // Forward to fallback webhook if configured
       if (config.fallbackWebhook) {
         try {
           await axios.post(
@@ -101,7 +135,7 @@ export async function dispatch(
             },
             { timeout: 5000 }
           )
-          return { reply: '' } // Partner's system handles the reply
+          return { reply: '' }
         } catch {
           // Webhook failed — fall through to default message
         }

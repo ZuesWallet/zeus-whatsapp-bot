@@ -4,8 +4,10 @@ import { SessionService } from '../services/session.service'
 import { sendMessage, sendMessageWithImage } from '../services/sender.service'
 import { generateReceipt } from '../services/receipt.service'
 import { dispatch } from '../handlers'
+import { sendHelpGuide } from '../handlers/onboarding.handler'
 import { getRedisClient } from '../lib/redis'
-import type { InboundMessage } from '../types'
+import { metaService } from '../services/meta.service'
+import type { InboundMessage, Session, PartnerConfig } from '../types'
 
 const router = Router()
 const routing = new RoutingService()
@@ -70,9 +72,85 @@ router.post('/', (req: Request, res: Response) => {
             const inserted = await redis.set(dedupKey, '1', 'EX', 3600, 'NX')
             if (!inserted) continue
 
-            // Flow submission: nfm_reply fires when the user clicks "Done" on the
-            // SUCCESS screen. We send them a "Transaction confirmed" message + receipt.
-            if (message.type === 'interactive' && (message as any).interactive?.type === 'nfm_reply') {
+            const contactName = value.contacts?.[0]?.profile?.name ?? ''
+
+            // ── request_welcome — Meta fires this when user opens chat for first time
+            if (message.type === 'request_welcome') {
+              const inbound: InboundMessage = {
+                from,
+                to: metadata.display_phone_number,
+                body: '',
+                messageId,
+                timestamp: Date.now(),
+                contactName,
+                isWelcomeRequest: true,
+              }
+
+              const session = await sessions.get(inbound.from, config.partnerId)
+              const output = await dispatch(inbound, session, config)
+
+              if (output.newSession !== undefined) {
+                if (!output.newSession?.flow && !output.newSession?.step) {
+                  await sessions.clear(inbound.from, config.partnerId)
+                } else {
+                  await sessions.set(inbound.from, config.partnerId, output.newSession)
+                }
+              }
+
+              if (output.reply && config.metaCredentials) {
+                await metaService.send({
+                  to: inbound.from,
+                  from: metadata.phone_number_id,
+                  body: output.reply,
+                  accessToken: config.metaCredentials.accessToken,
+                  phoneNumberId: config.metaCredentials.phoneNumberId,
+                })
+              }
+              continue
+            }
+
+            // ── nfm_reply — user completed a Flow (tapped Done/Continue)
+            if (
+              message.type === 'interactive' &&
+              (message.interactive as any)?.type === 'nfm_reply'
+            ) {
+              const nfmReply = (message.interactive as any).nfm_reply
+              const responseData = JSON.parse(nfmReply?.response_json || '{}')
+              const flowToken: string = responseData.flow_token ?? ''
+
+              // PIN setup Flow completed
+              if (flowToken.startsWith('setpin_')) {
+                if (config.metaCredentials) {
+                  await metaService.send({
+                    to: from,
+                    from: metadata.phone_number_id,
+                    body: '🚀 Securing your account 🔐...',
+                    accessToken: config.metaCredentials.accessToken,
+                    phoneNumberId: config.metaCredentials.phoneNumberId,
+                  })
+
+                  await new Promise(r => setTimeout(r, 1500))
+
+                  await metaService.send({
+                    to: from,
+                    from: metadata.phone_number_id,
+                    body:
+                      'All set! 🎉 Now your wallet is secure. ' +
+                      "Keep your PIN private — it's your key to staying secure.",
+                    accessToken: config.metaCredentials.accessToken,
+                    phoneNumberId: config.metaCredentials.phoneNumberId,
+                  })
+
+                  await new Promise(r => setTimeout(r, 1000))
+
+                  await sendHelpGuide(from, config)
+                }
+
+                await sessions.clear(from, config.partnerId)
+                continue
+              }
+
+              // Cashout Flow completed — existing behaviour
               const session = await sessions.get(from, config.partnerId)
               if (session?.step === 'AWAITING_FLOW_SENT') {
                 const d = session.data
@@ -91,7 +169,6 @@ router.post('/', (req: Request, res: Response) => {
 
                 await sendMessage(from, confirmText, config)
 
-                // Generate and send receipt
                 if (d.transactionId && est) {
                   try {
                     const receiptBuffer = await generateReceipt({
@@ -117,6 +194,44 @@ router.post('/', (req: Request, res: Response) => {
               continue
             }
 
+            // ── button_reply — user tapped a reply button
+            if (
+              message.type === 'interactive' &&
+              (message.interactive as any)?.type === 'button_reply'
+            ) {
+              const buttonReply = (message.interactive as any).button_reply
+              const inbound: InboundMessage = {
+                from,
+                to: metadata.display_phone_number,
+                body: buttonReply.id,
+                messageId,
+                timestamp: Date.now(),
+                contactName,
+              }
+              const session = await sessions.get(from, config.partnerId)
+              await dispatchAndReply(inbound, session, config, from, metadata.phone_number_id)
+              continue
+            }
+
+            // ── list_reply — user selected a list item
+            if (
+              message.type === 'interactive' &&
+              (message.interactive as any)?.type === 'list_reply'
+            ) {
+              const listReply = (message.interactive as any).list_reply
+              const inbound: InboundMessage = {
+                from,
+                to: metadata.display_phone_number,
+                body: listReply.id,
+                messageId,
+                timestamp: Date.now(),
+                contactName,
+              }
+              const session = await sessions.get(from, config.partnerId)
+              await dispatchAndReply(inbound, session, config, from, metadata.phone_number_id)
+              continue
+            }
+
             if (message.type !== 'text') continue
 
             const messageBody = message.text?.body || ''
@@ -130,26 +245,10 @@ router.post('/', (req: Request, res: Response) => {
               body: messageBody,
               messageId,
               timestamp: Date.now(),
+              contactName,
             }
 
-            const output = await dispatch(inbound, session, config)
-
-            if (output.newSession !== undefined) {
-              if (
-                output.newSession === null ||
-                (!output.newSession.flow && !output.newSession.step)
-              ) {
-                await sessions.clear(from, config.partnerId)
-              } else {
-                await sessions.set(from, config.partnerId, output.newSession)
-              }
-            } else {
-              await sessions.extendTTL(from, config.partnerId)
-            }
-
-            if (output.reply) {
-              await sendMessage(from, output.reply, config)
-            }
+            await dispatchAndReply(inbound, session, config, from, metadata.phone_number_id)
           }
         }
       }
@@ -158,6 +257,30 @@ router.post('/', (req: Request, res: Response) => {
     }
   })()
 })
+
+async function dispatchAndReply(
+  inbound: InboundMessage,
+  session: Session,
+  config: PartnerConfig,
+  from: string,
+  phoneNumberId: string
+): Promise<void> {
+  const output = await dispatch(inbound, session, config)
+
+  if (output.newSession !== undefined) {
+    if (output.newSession === null || (!output.newSession.flow && !output.newSession.step)) {
+      await sessions.clear(from, config.partnerId)
+    } else {
+      await sessions.set(from, config.partnerId, output.newSession)
+    }
+  } else {
+    await sessions.extendTTL(from, config.partnerId)
+  }
+
+  if (output.reply) {
+    await sendMessage(from, output.reply, config)
+  }
+}
 
 interface MetaWebhookPayload {
   object: string
@@ -180,6 +303,7 @@ interface MetaChangeValue {
     display_phone_number: string
     phone_number_id: string
   }
+  contacts?: Array<{ profile?: { name?: string } }>
   messages?: MetaMessage[]
 }
 
@@ -189,6 +313,7 @@ interface MetaMessage {
   timestamp: string
   type: string
   text?: { body: string }
+  interactive?: unknown
 }
 
 export default router

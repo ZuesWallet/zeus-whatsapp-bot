@@ -1,0 +1,38 @@
+{
+  "version": "7.3",
+  "data_api_version": "4.0",
+  "routing_model": { "SELECT_CURRENCY": [] },
+  "screens": [
+    {
+      "id": "SELECT_CURRENCY",
+      "title": "Select Currency",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Choose Currency" },
+          { "type": "TextBody", "text": "Select the currency you want to receive:" },
+          {
+            "type": "RadioButtonsGroup",
+            "label": "Available currencies",
+            "name": "currency",
+            "required": true,
+            "data-source": [
+              { "id": "NGN", "title": "NGN - Nigerian Naira" }
+            ]
+          },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": { "currency": "${form.currency}" }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

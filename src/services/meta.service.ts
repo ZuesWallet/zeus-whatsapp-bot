@@ -44,8 +44,38 @@ export class MetaService {
     screenId: string
     flowData: Record<string, string>
     flowToken: string
+    mode?: 'draft' | 'published'
   }): Promise<void> {
     const to = params.to.replace('whatsapp:', '').replace('+', '')
+
+    // Use navigate action when a screenId + flowData is provided so the Flow
+    // opens directly at the given screen with pre-populated data.
+    // Otherwise fall back to data_exchange (server-driven INIT).
+    const hasInitData = params.screenId && Object.keys(params.flowData).length > 0
+    const flowAction = hasInitData ? 'navigate' : 'data_exchange'
+
+    const actionParameters: Record<string, unknown> = {
+      flow_message_version: '3',
+      flow_token: params.flowToken,
+      flow_id: params.flowId,
+      flow_cta: params.flowCta,
+      flow_action: flowAction,
+    }
+
+    if (params.mode === 'draft') {
+      actionParameters.mode = 'draft'
+    }
+
+    if (hasInitData) {
+      actionParameters.flow_action_payload = {
+        screen: params.screenId,
+        data: params.flowData,
+      }
+    }
+
+    const bodyText = hasInitData
+      ? 'Tap the button below to continue.'
+      : 'Review your transaction details and enter your PIN to confirm.'
 
     const payload = {
       messaging_product: 'whatsapp',
@@ -54,18 +84,10 @@ export class MetaService {
       type: 'interactive',
       interactive: {
         type: 'flow',
-        body: {
-          text: 'Review your transaction details and enter your PIN to confirm.',
-        },
+        body: { text: bodyText },
         action: {
           name: 'flow',
-          parameters: {
-            flow_message_version: '3',
-            flow_token: params.flowToken,
-            flow_id: params.flowId,
-            flow_cta: params.flowCta,
-            flow_action: 'data_exchange',
-          },
+          parameters: actionParameters,
         },
       },
     }
@@ -125,6 +147,94 @@ export class MetaService {
         image: {
           id: mediaId,
           caption: params.caption,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${params.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 15000,
+      }
+    )
+  }
+
+  async sendButtons(params: {
+    to: string
+    phoneNumberId: string
+    accessToken: string
+    body: string
+    buttons: Array<{ id: string; title: string }>
+    header?: string
+    footer?: string
+  }): Promise<void> {
+    const to = params.to.replace('whatsapp:', '').replace('+', '')
+
+    await axios.post(
+      `${META_API_BASE}/${params.phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          ...(params.header ? { header: { type: 'text', text: params.header } } : {}),
+          body: { text: params.body },
+          ...(params.footer ? { footer: { text: params.footer } } : {}),
+          action: {
+            buttons: params.buttons.map(b => ({
+              type: 'reply',
+              reply: { id: b.id, title: b.title },
+            })),
+          },
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${params.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 15000,
+      }
+    )
+  }
+
+  async sendList(params: {
+    to: string
+    phoneNumberId: string
+    accessToken: string
+    body: string
+    buttonText: string
+    sections: Array<{
+      title?: string
+      rows: Array<{
+        id: string
+        title: string
+        description?: string
+      }>
+    }>
+    header?: string
+    footer?: string
+  }): Promise<void> {
+    const to = params.to.replace('whatsapp:', '').replace('+', '')
+
+    await axios.post(
+      `${META_API_BASE}/${params.phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'list',
+          ...(params.header ? { header: { type: 'text', text: params.header } } : {}),
+          body: { text: params.body },
+          ...(params.footer ? { footer: { text: params.footer } } : {}),
+          action: {
+            button: params.buttonText,
+            sections: params.sections,
+          },
         },
       },
       {

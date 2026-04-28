@@ -1,0 +1,74 @@
+{
+  "version": "7.3",
+  "data_api_version": "4.0",
+  "routing_model": {
+    "SET_PIN": ["PIN_SUCCESS"],
+    "PIN_SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "SET_PIN",
+      "title": "Set Transaction PIN",
+      "data": {
+        "user_name": { "type": "string", "__example__": "Bassey" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Secure Your Wallet" },
+          { "type": "TextBody", "text": "Hi ${data.user_name}! Set a 6-digit PIN to protect your transactions." },
+          {
+            "type": "TextInput",
+            "label": "Enter PIN",
+            "name": "pin",
+            "input-type": "password",
+            "required": true,
+            "min-chars": 6,
+            "max-chars": 6,
+            "helper-text": "Choose a 6-digit PIN"
+          },
+          {
+            "type": "TextInput",
+            "label": "Confirm PIN",
+            "name": "pin_confirm",
+            "input-type": "password",
+            "required": true,
+            "min-chars": 6,
+            "max-chars": 6,
+            "helper-text": "Re-enter your PIN to confirm"
+          },
+          {
+            "type": "Footer",
+            "label": "Set PIN",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "pin": "${form.pin}",
+                "pin_confirm": "${form.pin_confirm}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PIN_SUCCESS",
+      "title": "PIN Set",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "You're all set!" },
+          { "type": "TextBody", "text": "Your wallet is now secured. Keep your PIN private." },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": { "name": "complete", "payload": {} }
+          }
+        ]
+      }
+    }
+  ]
+}

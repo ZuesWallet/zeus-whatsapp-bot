@@ -73,6 +73,34 @@ export class ZeusPayService {
     })
   }
 
+  async getUserProfile(phone: string, apiKey: string): Promise<{
+    id: string
+    phone: string
+    fullName: string | null
+    kycTier: number
+    hasPinSet: boolean
+    isNew: boolean
+  }> {
+    const createRes = await this.client(apiKey).post('/api/v1/partner/users', {
+      externalUserId: phone,
+    })
+    const isNew: boolean = createRes.data.data.isNew ?? false
+
+    const profileRes = await this.client(apiKey).get(
+      `/api/v1/partner/users/${encodeURIComponent(phone)}`
+    )
+    const user = profileRes.data.data
+
+    return {
+      id: user.id,
+      phone: user.phone,
+      fullName: user.fullName ?? null,
+      kycTier: user.kycTier ?? 0,
+      hasPinSet: !!user.transactionPin || user.pinSetAt != null,
+      isNew,
+    }
+  }
+
   async getWallets(phone: string, apiKey: string): Promise<ZeusPayWallet[]> {
     return this.withRetry(async () => {
       const res = await this.client(apiKey).get(`/api/v1/partner/users/${encodeURIComponent(phone)}/wallets`)

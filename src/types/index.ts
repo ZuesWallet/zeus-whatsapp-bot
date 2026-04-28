@@ -15,6 +15,8 @@ export interface InboundMessage {
   body: string       // Raw message text
   messageId: string  // Twilio MessageSid — for deduplication
   timestamp: number  // Unix ms
+  contactName?: string        // from contacts[0].profile.name (Meta only)
+  isWelcomeRequest?: boolean  // true when Meta fires request_welcome
 }
 
 // Partner config resolved from routing lookup
@@ -43,7 +45,7 @@ export interface PartnerConfig {
 
 // Redis session state
 export interface Session {
-  flow: 'CASHOUT' | 'ADD_BANK' | 'SET_PIN' | 'CHANGE_PIN' | 'FORGOT_PIN' | null
+  flow: 'CASHOUT' | 'ADD_BANK' | 'SET_PIN' | 'CHANGE_PIN' | 'FORGOT_PIN' | 'WITHDRAW' | 'ONBOARDING_PIN' | null
   step: string | null
   data: {
     asset?: string
@@ -69,6 +71,7 @@ export interface Session {
 
 // Parsed intent from message text
 export type Intent =
+  | { type: 'ONBOARDING' }
   | { type: 'RATE' }
   | { type: 'BALANCE' }
   | { type: 'WALLET' }

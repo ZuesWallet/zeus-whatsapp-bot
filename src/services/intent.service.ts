@@ -1,34 +1,49 @@
 import type { Intent } from '../types'
 
 export class IntentService {
-  parse(text: string): Intent {
-    const t = text.trim().toLowerCase()
+  parse(rawBody: string): Intent {
+    // Strip leading slash — /balance, /withdraw etc from command menu
+    const stripped = rawBody.trim().startsWith('/')
+      ? rawBody.trim().slice(1).trim()
+      : rawBody.trim()
 
-    // PIN entry: exactly 6 digits, nothing else
+    const t = stripped.toLowerCase()
+
+    // ── Ice breaker + greetings → ONBOARDING ─────────────────────────────
+    // "Hi 👋" is the registered ice breaker.
+    // All greetings trigger onboarding check (new user → PIN flow,
+    // returning user → welcome back + help guide)
+    if (
+      t === 'hi 👋' ||
+      t === 'hi' ||
+      t === 'hello' ||
+      t === 'hey' ||
+      t === 'start'
+    ) {
+      return { type: 'ONBOARDING' }
+    }
+
+    // ── PIN entry: exactly 6 digits ───────────────────────────────────────
     if (/^\d{6}$/.test(t)) {
       return { type: 'PIN_ENTRY', pin: t }
     }
 
-    // Menu selection: single digit 1–9
+    // ── Menu selection: single digit 1–9 ─────────────────────────────────
     if (/^[1-9]$/.test(t)) {
       return { type: 'MENU_SELECT', option: t }
     }
 
-    // Cancel / stop
+    // ── Cancel ────────────────────────────────────────────────────────────
     if (['cancel', 'stop', 'quit', 'exit', 'abort'].includes(t)) {
       return { type: 'CANCEL' }
     }
 
-    // Help / menu / greeting
-    if (
-      ['help', 'menu', 'hi', 'hello', 'start', 'hey', '?'].includes(t) ||
-      t.startsWith('hi ') ||
-      t.startsWith('hello ')
-    ) {
+    // ── Help — only explicit help requests ────────────────────────────────
+    if (['help', 'menu', '?'].includes(t)) {
       return { type: 'HELP' }
     }
 
-    // Rate
+    // ── Rate ──────────────────────────────────────────────────────────────
     if (
       t.includes('rate') ||
       t.includes('price') ||
@@ -39,30 +54,34 @@ export class IntentService {
       return { type: 'RATE' }
     }
 
-    // Balance
+    // ── Balance ───────────────────────────────────────────────────────────
     if (
+      t === 'balance' ||
       t.includes('balance') ||
       t === 'bal' ||
       t.includes('my balance') ||
       t.includes('check balance') ||
-      t.includes('how many')
+      t.includes('how many') ||
+      t === 'check my balance'
     ) {
       return { type: 'BALANCE' }
     }
 
-    // Wallet / deposit address
+    // ── Wallet / deposit address ──────────────────────────────────────────
     if (
+      t === 'wallet' ||
       t.includes('wallet') ||
       t.includes('deposit') ||
       t.includes('address') ||
       t.includes('send wallet') ||
       t.includes('receive') ||
-      t === 'addr'
+      t === 'addr' ||
+      t === 'view deposit address'
     ) {
       return { type: 'WALLET' }
     }
 
-    // History
+    // ── History ───────────────────────────────────────────────────────────
     if (
       t.includes('history') ||
       t.includes('transaction') ||
@@ -74,8 +93,9 @@ export class IntentService {
       return { type: 'HISTORY' }
     }
 
-    // Add bank
+    // ── Add bank ──────────────────────────────────────────────────────────
     if (
+      t === 'addbank' ||
       t.includes('add bank') ||
       t.includes('bank account') ||
       t.includes('add account') ||
@@ -84,7 +104,7 @@ export class IntentService {
       return { type: 'ADD_BANK' }
     }
 
-    // Forgot PIN / reset PIN
+    // ── Forgot PIN ────────────────────────────────────────────────────────
     if (
       t.includes('forgot pin') ||
       t.includes('forget pin') ||
@@ -95,7 +115,7 @@ export class IntentService {
       return { type: 'FORGOT_PIN' }
     }
 
-    // Change PIN (knows current PIN)
+    // ── Change PIN ────────────────────────────────────────────────────────
     if (
       t.includes('change pin') ||
       t.includes('update pin') ||
@@ -104,8 +124,9 @@ export class IntentService {
       return { type: 'CHANGE_PIN' }
     }
 
-    // Set PIN (first time)
+    // ── Set PIN ───────────────────────────────────────────────────────────
     if (
+      t === 'setpin' ||
       t.includes('set pin') ||
       t.includes('create pin') ||
       t.includes('new pin') ||
@@ -114,8 +135,9 @@ export class IntentService {
       return { type: 'SET_PIN' }
     }
 
-    // Cashout — also try to extract amount and asset
+    // ── Cashout / withdraw ────────────────────────────────────────────────
     if (
+      t === 'withdraw' ||
       t.includes('cash out') ||
       t.includes('cashout') ||
       t.includes('cash-out') ||
@@ -133,7 +155,6 @@ export class IntentService {
         if (/trc/i.test(networkRaw)) networkSuffix = '_TRC20'
         else if (/base/i.test(networkRaw)) networkSuffix = '_BASE'
         else if (/erc/i.test(networkRaw)) networkSuffix = '_ERC20'
-        // bep20 → BNB has no suffix variant
       }
 
       const assetMap: Record<string, string> = {

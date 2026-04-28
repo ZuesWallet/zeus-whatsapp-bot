@@ -1,0 +1,43 @@
+{
+  "version": "7.3",
+  "data_api_version": "4.0",
+  "routing_model": { "SELECT_BANK": [] },
+  "screens": [
+    {
+      "id": "SELECT_BANK",
+      "title": "Select Bank Account",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "currency": { "type": "string", "__example__": "NGN" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Where should we send your ${data.currency}?" },
+          {
+            "type": "RadioButtonsGroup",
+            "label": "Choose an option",
+            "name": "selection",
+            "required": true,
+            "data-source": [
+              { "id": "existing_0", "title": "GTBank - 6789" },
+              { "id": "add_new", "title": "Add new bank account" }
+            ]
+          },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "selection": "${form.selection}",
+                "currency": "${data.currency}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

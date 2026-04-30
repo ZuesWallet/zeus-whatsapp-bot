@@ -17,9 +17,9 @@ export async function handleOnboarding(
   const onboardedKey = `onboarded:${message.from}:${config.partnerId}`
   const isOnboarded = await redis.get(onboardedKey)
 
-  // ── Returning user (PIN already set, Redis key present) ───────────────────
-  // Don't re-run onboarding. For silent messages return null; for forced calls
-  // (greeting or chat-open) send a brief welcome-back + command list.
+  // ── Already onboarded (has PIN, Redis key present) ────────────────────────
+  // Non-forced messages: skip entirely, let dispatch route normally.
+  // Forced messages (greeting / chat open): send a brief welcome back + commands.
   if (isOnboarded) {
     if (!force) return null
 
@@ -27,21 +27,27 @@ export async function handleOnboarding(
 
     if (message.isWelcomeRequest) {
       return {
-        reply:
-          `Welcome back, ${firstName}! 👋\n\n` +
-          `Type */help* to see everything you can do.`,
+        reply: `Welcome back, ${firstName}! 👋\n\nType */help* to see what you can do.`,
         newSession: { flow: null, step: null, data: {} },
       }
     }
 
-    // User greeted ("hi", "hello", etc.)
     return {
-      reply: buildCommandList(firstName, config.botName),
+      reply:
+        `Hey ${firstName}! 👋\n\n` +
+        `Here's what you can do:\n\n` +
+        `✅ *Check balance* — /balance\n` +
+        `✅ *Deposit crypto* — /wallet\n` +
+        `✅ *Sell crypto* — /withdraw\n` +
+        `✅ *Check rate* — /rate\n` +
+        `✅ *Transaction history* — /history\n` +
+        `✅ *Add bank account* — /addbank\n\n` +
+        `_Type /help anytime to see this menu._`,
       newSession: { flow: null, step: null, data: {} },
     }
   }
 
-  // ── New or unverified user — fetch profile ────────────────────────────────
+  // ── Fresh / unverified user — fetch profile ───────────────────────────────
   let profile: Awaited<ReturnType<typeof zeuspay.getUserProfile>>
   try {
     profile = await zeuspay.getUserProfile(message.from, config.partnerApiKey)
@@ -52,7 +58,6 @@ export async function handleOnboarding(
   const displayName = message.contactName || profile.fullName || message.from
   const firstName = displayName.split(' ')[0]
 
-  // ── No PIN set — prompt setup ─────────────────────────────────────────────
   if (!profile.hasPinSet) {
     if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
       const safePhone = message.from.replace(/\+/g, '')
@@ -69,8 +74,9 @@ export async function handleOnboarding(
         to: message.from,
         from: config.metaCredentials.phoneNumberId,
         body:
-          `Welcome to ${config.botName}! 👋\n\n` +
-          `🔐 Please set up a 6-digit transaction PIN to secure your wallet.`,
+          `Welcome back ${displayName}! 👋\n\n` +
+          `🔐 We've improved security on your wallet. ` +
+          `Please set up a transaction PIN to secure your account.`,
         accessToken: config.metaCredentials.accessToken,
         phoneNumberId: config.metaCredentials.phoneNumberId,
       })
@@ -111,34 +117,33 @@ export async function handleOnboarding(
 
     return {
       reply:
-        `Welcome to ${config.botName}! 👋\n\n` +
-        `🔐 Please set up a transaction PIN to secure your wallet.\n\n` +
+        `Welcome back ${displayName}! 👋\n\n` +
+        `🔐 We've improved security on your wallet. ` +
+        `Please set up a transaction PIN.\n\n` +
         `Type *set pin* to get started.`,
       newSession: { flow: null, step: null, data: {} },
     }
   }
 
-  // ── PIN is set — mark onboarded and send welcome ──────────────────────────
+  // ── Has PIN — first time through (Redis key absent). Mark onboarded. ──────
   await redis.set(onboardedKey, '1')
 
+  if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
+    await metaService.send({
+      to: message.from,
+      from: config.metaCredentials.phoneNumberId,
+      body: `Welcome back ${firstName}! 👋`,
+      accessToken: config.metaCredentials.accessToken,
+      phoneNumberId: config.metaCredentials.phoneNumberId,
+    })
+    await new Promise(r => setTimeout(r, 800))
+    await sendHelpGuide(message.from, config, firstName)
+  }
+
   return {
-    reply: buildCommandList(firstName, config.botName),
+    reply: '',
     newSession: { flow: null, step: null, data: {} },
   }
-}
-
-function buildCommandList(firstName: string, botName?: string | null): string {
-  return (
-    `Hey ${firstName}! 👋\n\n` +
-    `Here's what you can do${botName ? ` with *${botName}*` : ''}:\n\n` +
-    `✅ *Check balance* — /balance\n` +
-    `✅ *Deposit crypto* — /wallet\n` +
-    `✅ *Sell crypto* — /withdraw\n` +
-    `✅ *Check rate* — /rate\n` +
-    `✅ *Transaction history* — /history\n` +
-    `✅ *Add bank account* — /addbank\n\n` +
-    `_Type /help anytime to see this menu._`
-  )
 }
 
 export async function sendHelpGuide(
@@ -148,10 +153,20 @@ export async function sendHelpGuide(
 ): Promise<void> {
   if (config.bspType !== 'META_CLOUD' || !config.metaCredentials) return
 
+  const greeting = firstName ? `All set, ${firstName}! 🎉\n\n` : ''
+
   await metaService.send({
     to: phone,
     from: config.metaCredentials.phoneNumberId,
-    body: buildCommandList(firstName || 'there', config.botName),
+    body:
+      `${greeting}Here is what you can do with *${config.botName}*.\n\n` +
+      `✅ *Check balance* — /balance\n` +
+      `✅ *Deposit crypto* — /wallet\n` +
+      `✅ *Sell crypto* — /withdraw\n` +
+      `✅ *Check rate* — /rate\n` +
+      `✅ *Transaction history* — /history\n` +
+      `✅ *Add bank account* — /addbank\n\n` +
+      `_Type /help anytime to see this menu._`,
     accessToken: config.metaCredentials.accessToken,
     phoneNumberId: config.metaCredentials.phoneNumberId,
   })

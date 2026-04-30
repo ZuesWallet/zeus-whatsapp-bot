@@ -174,12 +174,16 @@ router.post('/', (req: Request, res: Response) => {
               const session = await sessions.get(from, config.partnerId)
               if (session?.step === 'AWAITING_FLOW_SENT') {
                 if (flowStatus === 'failed') {
-                  // Transfer failed — Flow already showed the error screen, just clean up
+                  await sendMessage(
+                    from,
+                    `❌ *Transaction Failed*\n\nYour wallet balance has been refunded. Please type */withdraw* to try again.`,
+                    config
+                  )
                   await sessions.clear(from, config.partnerId)
                   continue
                 }
 
-                // flowStatus === 'success' (or unset for backward compat)
+                // flowStatus === 'success'
                 const d = session.data
                 const est = d.estimate
                 const bankName = d.bankName || ''
@@ -188,14 +192,15 @@ router.post('/', (req: Request, res: Response) => {
                 const ngnFormatted = parseFloat(String(est?.ngnAmount || '0')).toLocaleString('en-NG', {
                   minimumFractionDigits: 2, maximumFractionDigits: 2,
                 })
+                const cryptoFormatted = parseFloat(String(est?.cryptoAmount || d.amount || '0')).toString()
 
-                // Transfer is queued with Flutterwave (status: NEW) — not yet confirmed.
-                // Receipt and final confirmation come from the Flutterwave webhook (cashout_completed template).
                 await sendMessage(
                   from,
-                  `⏳ *Transfer Submitted*\n\n` +
-                  `₦${ngnFormatted} is being sent to your ${bankName} account ending ••••${last4}.\n\n` +
-                  `You'll receive a confirmation message and receipt once the bank confirms the transfer. This usually takes under 5 minutes.`,
+                  `✅ *Transaction Confirmed!*\n\n` +
+                  `*Amount:* ${cryptoFormatted} ${asset}\n` +
+                  `*You receive:* ₦${ngnFormatted}\n` +
+                  `*To:* ${bankName} ••••${last4}\n\n` +
+                  `Your transfer is being processed and will arrive shortly.`,
                   config
                 )
 

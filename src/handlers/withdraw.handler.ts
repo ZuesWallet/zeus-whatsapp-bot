@@ -60,10 +60,10 @@ export async function withdrawHandler(input: HandlerInput): Promise<HandlerOutpu
     const bankAccounts = (session.data as any).bankAccounts as BankAccount[]
 
     if (message.body === 'bank_add_new') {
-      return {
-        reply: '🏦 Let\'s add a new bank account.',
-        newSession: { flow: 'ADD_BANK', step: null, data: { returnTo: 'WITHDRAW', currency } as any },
-      }
+      return addBankHandler({
+        ...input,
+        session: { flow: 'ADD_BANK', step: null, data: { returnTo: 'WITHDRAW', currency } as any },
+      })
     }
 
     const idx = parseInt(message.body.replace('bank_', ''), 10)
@@ -85,10 +85,10 @@ export async function withdrawHandler(input: HandlerInput): Promise<HandlerOutpu
     const bankAccounts = (session.data as any).bankAccounts as BankAccount[]
 
     if (message.body === String(bankAccounts.length + 1)) {
-      return {
-        reply: '🏦 Let\'s add a new bank account.',
-        newSession: { flow: 'ADD_BANK', step: null, data: { returnTo: 'WITHDRAW', currency } as any },
-      }
+      return addBankHandler({
+        ...input,
+        session: { flow: 'ADD_BANK', step: null, data: { returnTo: 'WITHDRAW', currency } as any },
+      })
     }
 
     const idx = parseInt(message.body, 10) - 1

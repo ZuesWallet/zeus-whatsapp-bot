@@ -17,37 +17,12 @@ export async function handleOnboarding(
   const onboardedKey = `onboarded:${message.from}:${config.partnerId}`
   const isOnboarded = await redis.get(onboardedKey)
 
-  // ── Already onboarded (has PIN, Redis key present) ────────────────────────
-  // Non-forced messages: skip entirely, let dispatch route normally.
-  // Forced messages (greeting / chat open): send a brief welcome back + commands.
-  if (isOnboarded) {
-    if (!force) return null
+  // Non-forced messages — skip onboarding entirely for known users.
+  // PIN-less users never get this key set, so they always see the PIN prompt.
+  if (isOnboarded && !force) return null
 
-    const firstName = (message.contactName || 'there').split(' ')[0]
-
-    if (message.isWelcomeRequest) {
-      return {
-        reply: `Welcome back, ${firstName}! 👋\n\nType */help* to see what you can do.`,
-        newSession: { flow: null, step: null, data: {} },
-      }
-    }
-
-    return {
-      reply:
-        `Hey ${firstName}! 👋\n\n` +
-        `Here's what you can do:\n\n` +
-        `✅ *Check balance* — /balance\n` +
-        `✅ *Deposit crypto* — /wallet\n` +
-        `✅ *Sell crypto* — /withdraw\n` +
-        `✅ *Check rate* — /rate\n` +
-        `✅ *Transaction history* — /history\n` +
-        `✅ *Add bank account* — /addbank\n\n` +
-        `_Type /help anytime to see this menu._`,
-      newSession: { flow: null, step: null, data: {} },
-    }
-  }
-
-  // ── Fresh / unverified user — fetch profile ───────────────────────────────
+  // Always fetch profile on forced messages so the user is created in the DB
+  // and their current PIN status is authoritative (Redis key can be stale).
   let profile: Awaited<ReturnType<typeof zeuspay.getUserProfile>>
   try {
     profile = await zeuspay.getUserProfile(message.from, config.partnerApiKey)
@@ -58,7 +33,11 @@ export async function handleOnboarding(
   const displayName = message.contactName || profile.fullName || message.from
   const firstName = displayName.split(' ')[0]
 
+  // ── No PIN set — run full onboarding ─────────────────────────────────────
   if (!profile.hasPinSet) {
+    // Clear any stale onboarded key (shouldn't exist, but be safe)
+    if (isOnboarded) await redis.del(onboardedKey)
+
     if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
       const safePhone = message.from.replace(/\+/g, '')
       const flowToken = `setpin_${safePhone}_${Date.now()}`
@@ -125,9 +104,34 @@ export async function handleOnboarding(
     }
   }
 
-  // ── Has PIN — first time through (Redis key absent). Mark onboarded. ──────
+  // ── Has PIN ───────────────────────────────────────────────────────────────
   await redis.set(onboardedKey, '1')
 
+  if (isOnboarded) {
+    // Returning user who greeted or opened chat — brief welcome + commands
+    if (message.isWelcomeRequest) {
+      return {
+        reply: `Welcome back, ${firstName}! 👋\n\nType */help* to see what you can do.`,
+        newSession: { flow: null, step: null, data: {} },
+      }
+    }
+
+    return {
+      reply:
+        `Hey ${firstName}! 👋\n\n` +
+        `Here's what you can do:\n\n` +
+        `✅ *Check balance* — /balance\n` +
+        `✅ *Deposit crypto* — /wallet\n` +
+        `✅ *Sell crypto* — /withdraw\n` +
+        `✅ *Check rate* — /rate\n` +
+        `✅ *Transaction history* — /history\n` +
+        `✅ *Add bank account* — /addbank\n\n` +
+        `_Type /help anytime to see this menu._`,
+      newSession: { flow: null, step: null, data: {} },
+    }
+  }
+
+  // First time we've seen this user with a PIN (key was absent) — full welcome
   if (config.bspType === 'META_CLOUD' && config.metaCredentials) {
     await metaService.send({
       to: message.from,

@@ -2,8 +2,9 @@
   "version": "7.3",
   "data_api_version": "3.0",
   "routing_model": {
-    "CONFIRM_CASHOUT": ["CASHOUT_DONE"],
-    "CASHOUT_DONE": []
+    "CONFIRM_CASHOUT": ["CASHOUT_SUCCESS", "CASHOUT_FAILED"],
+    "CASHOUT_SUCCESS": [],
+    "CASHOUT_FAILED": []
   },
   "screens": [
     {
@@ -16,7 +17,8 @@
         "rate_text":      { "type": "string", "__example__": "Rate: 1 USDC = ₦1,365.21" },
         "bank_text":      { "type": "string", "__example__": "OPay — ••••8193" },
         "account_name":   { "type": "string", "__example__": "JOHN DOE" },
-        "transaction_id": { "type": "string", "__example__": "txn_abc123" }
+        "transaction_id": { "type": "string", "__example__": "txn_abc123" },
+        "error_message":  { "type": "string", "__example__": "" }
       },
       "layout": {
         "type": "SingleColumnLayout",
@@ -37,7 +39,8 @@
             "required": true,
             "min-chars": 6,
             "max-chars": 6,
-            "helper-text": "Enter your 6-digit PIN to confirm"
+            "helper-text": "Enter your 6-digit PIN",
+            "error-message": "${data.error_message}"
           },
           {
             "type": "Footer",
@@ -54,8 +57,8 @@
       }
     },
     {
-      "id": "CASHOUT_DONE",
-      "title": "Cashout Submitted",
+      "id": "CASHOUT_SUCCESS",
+      "title": "Transfer Submitted",
       "terminal": true,
       "success": true,
       "data": {
@@ -64,13 +67,41 @@
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Thank you for trading with us" },
+          { "type": "TextHeading", "text": "Transfer Submitted! 🎉" },
           { "type": "TextBody", "text": "${data.summary_text}" },
-          { "type": "TextBody", "text": "We'll send you a message when the transfer is confirmed. This usually takes under 5 minutes." },
+          { "type": "TextBody", "text": "You'll be notified once the transfer is complete. This usually takes a few minutes." },
           {
             "type": "Footer",
             "label": "Done",
-            "on-click-action": { "name": "complete", "payload": {} }
+            "on-click-action": {
+              "name": "complete",
+              "payload": { "status": "success" }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CASHOUT_FAILED",
+      "title": "Transfer Failed",
+      "terminal": true,
+      "success": false,
+      "data": {
+        "error_message": { "type": "string", "__example__": "Your transfer could not be processed." }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Transfer Failed ❌" },
+          { "type": "TextBody", "text": "${data.error_message}" },
+          { "type": "TextBody", "text": "Your wallet balance has been refunded. Please try again in a few minutes by typing /withdraw." },
+          {
+            "type": "Footer",
+            "label": "Close",
+            "on-click-action": {
+              "name": "complete",
+              "payload": { "status": "failed" }
+            }
           }
         ]
       }

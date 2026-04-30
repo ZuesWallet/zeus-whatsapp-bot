@@ -167,9 +167,19 @@ router.post('/', (req: Request, res: Response) => {
                 continue
               }
 
-              // Cashout Flow completed — existing behaviour
+              // Cashout Flow completed
+              // Only send confirmation if the Flow screen was CASHOUT_SUCCESS (status: "success").
+              // CASHOUT_FAILED also fires nfm_reply — we must not send a confirmation in that case.
+              const flowStatus: string = responseData.status ?? ''
               const session = await sessions.get(from, config.partnerId)
               if (session?.step === 'AWAITING_FLOW_SENT') {
+                if (flowStatus === 'failed') {
+                  // Transfer failed — Flow already showed the error screen, just clean up
+                  await sessions.clear(from, config.partnerId)
+                  continue
+                }
+
+                // flowStatus === 'success' (or unset for backward compat)
                 const d = session.data
                 const est = d.estimate
                 const bankName = d.bankName || ''

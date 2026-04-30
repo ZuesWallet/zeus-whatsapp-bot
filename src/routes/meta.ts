@@ -189,32 +189,15 @@ router.post('/', (req: Request, res: Response) => {
                   minimumFractionDigits: 2, maximumFractionDigits: 2,
                 })
 
-                const confirmText =
-                  `✅ *Transaction Confirmed!*\n\n` +
-                  `₦${ngnFormatted} is on its way to your ${bankName} account ending ••••${last4}.\n\n` +
-                  `This usually takes under 5 minutes. You'll receive a receipt once the transfer is complete.`
-
-                await sendMessage(from, confirmText, config)
-
-                if (d.transactionId && est) {
-                  try {
-                    const receiptBuffer = await generateReceipt({
-                      transactionId: String(d.transactionId),
-                      asset,
-                      cryptoAmount: String(est.cryptoAmount || '0'),
-                      ngnAmount: ngnFormatted,
-                      bankName,
-                      accountNumber: last4,
-                      rate: String(est.rateUsed || '0'),
-                      fee: String(est.feeAmountNgn || '0'),
-                      completedAt: new Date().toISOString(),
-                      botName: config.botName || 'GoGet',
-                    })
-                    await sendMessageWithImage(from, '📄 Your cashout receipt', receiptBuffer, config, '')
-                  } catch (receiptErr) {
-                    console.error('[meta] nfm_reply: receipt generation failed', receiptErr)
-                  }
-                }
+                // Transfer is queued with Flutterwave (status: NEW) — not yet confirmed.
+                // Receipt and final confirmation come from the Flutterwave webhook (cashout_completed template).
+                await sendMessage(
+                  from,
+                  `⏳ *Transfer Submitted*\n\n` +
+                  `₦${ngnFormatted} is being sent to your ${bankName} account ending ••••${last4}.\n\n` +
+                  `You'll receive a confirmation message and receipt once the bank confirms the transfer. This usually takes under 5 minutes.`,
+                  config
+                )
 
                 await sessions.clear(from, config.partnerId)
               }

@@ -331,9 +331,9 @@ const PRIORITY_BANK_CODES = new Set([
   '035', // Wema Bank
   '057', // Zenith Bank
   '090267', // Kuda
-  '999992', // OPay
-  '999991', // PalmPay
-  '50515',  // Moniepoint
+  '100004', // OPay
+  '100033', // PalmPay
+  '090405',  // Moniepoint
   '090405', // Opay (alt)
   '090175', // Lagos Building Investment Company / One Finance
   '090003', // Jubilee Life

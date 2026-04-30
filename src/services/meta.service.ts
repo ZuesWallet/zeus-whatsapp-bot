@@ -93,8 +93,6 @@ export class MetaService {
       },
     }
 
-    console.log('[metaService.sendFlow] sending flow', { to, flowId: params.flowId, flowAction, flowToken: params.flowToken })
-
     try {
       await axios.post(
         `${META_API_BASE}/${params.phoneNumberId}/messages`,

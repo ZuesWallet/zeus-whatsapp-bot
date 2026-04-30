@@ -107,11 +107,8 @@ async function openCashoutFlow(params: {
       }
 
       if (!flowData.transaction_id) {
-        console.error('[openCashoutFlow] transaction_id is empty — aborting Flow send')
         throw new Error('transaction_id missing from prepared cashout')
       }
-
-      console.log('[openCashoutFlow] flowData to inject:', JSON.stringify(flowData, null, 2))
 
       const redis = getRedisClient()
       await redis.set(

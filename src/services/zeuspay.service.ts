@@ -232,7 +232,6 @@ export class ZeusPayService {
           },
         }
       )
-      console.log('[prepareCashout] response.data.data:', JSON.stringify(res.data.data, null, 2))
       return res.data.data as PreparedCashout
     })
   }

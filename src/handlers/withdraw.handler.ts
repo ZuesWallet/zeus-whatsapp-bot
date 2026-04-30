@@ -3,6 +3,7 @@ import { IntentService } from '../services/intent.service'
 import { metaService } from '../services/meta.service'
 import { getRedisClient } from '../lib/redis'
 import type { HandlerInput, HandlerOutput } from '../types'
+import { addBankHandler } from './addBank.handler'
 
 const zeuspay = new ZeusPayService()
 const intentSvc = new IntentService()

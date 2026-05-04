@@ -14,11 +14,13 @@ export async function handleOnboarding(
 
   if (!message.body && !message.isWelcomeRequest && !force) return null
 
+  // Don't intercept messages while the user is mid-flow (e.g. PIN entry steps)
+  if (!force && input.session.flow) return null
+
   const onboardedKey = `onboarded:${message.from}:${config.partnerId}`
   const isOnboarded = await redis.get(onboardedKey)
 
   // Non-forced messages — skip onboarding entirely for known users.
-  // PIN-less users never get this key set, so they always see the PIN prompt.
   if (isOnboarded && !force) return null
 
   // Always fetch profile on forced messages so the user is created in the DB
@@ -94,13 +96,17 @@ export async function handleOnboarding(
       }
     }
 
+    // For Twilio: only interrupt on greeting — otherwise let the SET_PIN command handler work naturally
+    if (!force) return null
+
     return {
       reply:
         `Welcome back ${displayName}! 👋\n\n` +
-        `🔐 We've improved security on your wallet. ` +
-        `Please set up a transaction PIN.\n\n` +
-        `Type *set pin* to get started.`,
-      newSession: { flow: null, step: null, data: {} },
+        `🔐 *Set up your transaction PIN*\n\n` +
+        `Choose a 6-digit PIN you'll use to confirm cashouts.\n\n` +
+        `Enter your PIN now:\n\n` +
+        `Type *cancel* to set it up later.`,
+      newSession: { flow: 'SET_PIN', step: 'AWAITING_PIN', data: {} },
     }
   }
 

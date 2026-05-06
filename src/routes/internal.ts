@@ -15,7 +15,7 @@ const TEMPLATES: Record<string, string> = {
   cashout_completed:
     'Your cashout of {{1}} {{2}} is complete. ₦{{3}} has been sent to your {{4}} account ending in {{5}}. 🎉',
   deposit_detected:
-    '🔍 We received your deposit of *{{1}} {{2}}*. It\'s being confirmed on the blockchain — your balance will update shortly.',
+    '🔍 We received your deposit of *{{1}} {{2}}*. It\'s being confirmed on the blockchain, your balance will update shortly.',
   deposit_confirmed:
     '✅ Deposit confirmed. {{1}} {{2}} (≈ ₦{{3}}) has been credited to your wallet.',
   cashout_failed:

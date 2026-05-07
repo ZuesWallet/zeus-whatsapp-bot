@@ -8,6 +8,23 @@ import type { HandlerInput, HandlerOutput, ZeusPayEstimate, ZeusPayTransaction, 
 const zeuspay = new ZeusPayService()
 const intentSvc = new IntentService()
 
+// ── Asset detection from free-text input ─────────────────────────────────────
+
+function detectAssetFromText(text: string): string {
+  const u = text.toUpperCase().replace(/[\s-]/g, '_')
+  if (u.includes('ETH_BASE') || u.includes('ETHBASE')) return 'ETH_BASE'
+  if (u.includes('USDC_BASE') || u.includes('USDCBASE')) return 'USDC_BASE'
+  if (u.includes('USDT_TRC20') || u.includes('USDT_TRC')) return 'USDT_TRC20'
+  if (u.includes('USDT_ERC20') || u.includes('USDT_ERC')) return 'USDT_ERC20'
+  if (u.includes('USDC_ERC20') || u.includes('USDC_ERC')) return 'USDC_ERC20'
+  if (u.includes('USDC')) return 'USDC_ERC20'
+  if (u.includes('USDT')) return 'USDT_ERC20'
+  if (u.includes('BTC')) return 'BTC'
+  if (u.includes('BNB')) return 'BNB'
+  if (u.includes('ETH')) return 'ETH'
+  return ''
+}
+
 // ── Flow helper ───────────────────────────────────────────────────────────────
 
 /**
@@ -208,11 +225,12 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
       }
     }
 
+    const rawInput = message.body.trim()
     const amount =
       intent.type === 'CASHOUT' && intent.amount
         ? intent.amount
         : session.step === 'AWAITING_AMOUNT'
-        ? message.body.trim()
+        ? rawInput.match(/^(\d+(?:\.\d+)?)/)?.[1] ?? null
         : null
 
     if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
@@ -229,7 +247,7 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
 
     // Determine asset: use intent asset as a hint, but always verify balance.
     // If the hinted asset has zero balance, find the correct variant the user holds.
-    let asset = (intent.type === 'CASHOUT' && intent.asset) || ''
+    let asset = (intent.type === 'CASHOUT' && intent.asset) || detectAssetFromText(rawInput) || ''
 
     let wallets: Awaited<ReturnType<typeof zeuspay.getWallets>> = []
     try {

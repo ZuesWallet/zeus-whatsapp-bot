@@ -145,7 +145,9 @@ export class IntentService {
       t.includes('withdraw') ||
       t.includes('convert')
     ) {
-      const amountMatch = t.match(/(\d+(?:\.\d+)?)\s*(usdt|usdc|btc|eth|bnb)?\s*(erc.?20|trc.?20|base|bep.?20)?/)
+      // Match amount + optional asset, handling both underscore and space separators
+      // e.g. "0.001 ETH_BASE", "100 USDT", "cashout 50 usdc base"
+      const amountMatch = t.match(/(\d+(?:\.\d+)?)\s*(usdt|usdc|btc|eth|bnb)?[_\s]*(erc.?20|trc.?20|base|bep.?20)?/)
       const amount = amountMatch ? amountMatch[1] : undefined
       const assetRaw = amountMatch ? amountMatch[2]?.toUpperCase() : undefined
       const networkRaw = amountMatch ? amountMatch[3]?.toLowerCase() : undefined
@@ -167,6 +169,7 @@ export class IntentService {
         BTC: 'BTC',
         ETH: 'ETH',
         ETH_ERC20: 'ETH',
+        ETH_BASE: 'ETH_BASE',
         BNB: 'BNB',
         BNB_BEP20: 'BNB',
       }

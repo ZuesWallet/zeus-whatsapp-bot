@@ -168,42 +168,24 @@ router.post('/', (req: Request, res: Response) => {
               }
 
               // Cashout Flow completed
-              // Only send confirmation if the Flow screen was CASHOUT_SUCCESS (status: "success").
-              // CASHOUT_FAILED also fires nfm_reply — we must not send a confirmation in that case.
+              // CASHOUT_SUCCESS and CASHOUT_FAILED both fire nfm_reply.
+              //
+              // Do NOT send a "Transaction Confirmed" message here for the success case.
+              // handleTransferWebhook sends the definitive outcome (cashout_completed receipt
+              // or cashout_failed message) when Flutterwave resolves the transfer. If we also
+              // send a confirmation here we get contradictory messages when the transfer fails
+              // after the Flow endpoint times out and returns an optimistic processing screen.
               const flowStatus: string = responseData.status ?? ''
               const session = await sessions.get(from, config.partnerId)
               if (session?.step === 'AWAITING_FLOW_SENT') {
                 if (flowStatus === 'failed') {
                   await sendMessage(
                     from,
-                    `❌ *Transaction Failed*\n\nYour wallet balance has been refunded. Please type */withdraw* to try again.`,
+                    `❌ *Transfer Failed*\n\nYour cashout could not be completed. Your balance will be refunded shortly if it was debited. Type */withdraw* to try again.`,
                     config
                   )
-                  await sessions.clear(from, config.partnerId)
-                  continue
                 }
-
-                // flowStatus === 'success'
-                const d = session.data
-                const est = d.estimate
-                const bankName = d.bankName || ''
-                const last4 = (d.accountNumber || '').slice(-4) || '****'
-                const asset = (d.asset || '').replace('_ERC20', '').replace('_TRC20', '').replace('_BASE', '')
-                const ngnFormatted = parseFloat(String(est?.ngnAmount || '0')).toLocaleString('en-NG', {
-                  minimumFractionDigits: 2, maximumFractionDigits: 2,
-                })
-                const cryptoFormatted = parseFloat(String(est?.cryptoAmount || d.amount || '0')).toString()
-
-                await sendMessage(
-                  from,
-                  `✅ *Transaction Confirmed!*\n\n` +
-                  `*Amount:* ${cryptoFormatted} ${asset}\n` +
-                  `*You receive:* ₦${ngnFormatted}\n` +
-                  `*To:* ${bankName} ••••${last4}\n\n` +
-                  `Your transfer is being processed and will arrive shortly.`,
-                  config
-                )
-
+                // flowStatus === 'success': no message — handleTransferWebhook notifies the user
                 await sessions.clear(from, config.partnerId)
               }
               continue

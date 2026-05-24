@@ -108,7 +108,10 @@ export async function withdrawHandler(input: HandlerInput): Promise<HandlerOutpu
       const bank = (session.data as any).bank as BankAccount
 
       return {
-        reply: '💸 *How much would you like to sell?*\n\n_Reply with the amount, e.g. 100_',
+        reply:
+          '💸 *How much USD would you like to sell?*\n\n' +
+          '_Reply with the dollar amount, e.g. *100*_\n\n' +
+          "_We'll use your USDT or USDC first, then ETH or BTC if needed._",
         newSession: {
           flow: 'CASHOUT',
           step: 'AWAITING_AMOUNT',
@@ -282,7 +285,10 @@ async function sendProceedButton(
 
   // Twilio fallback
   return {
-    reply: 'How much would you like to sell? (e.g. 100)',
+    reply:
+      '💸 *How much USD would you like to sell?*\n\n' +
+      'Reply with the dollar amount, e.g. *100*\n\n' +
+      "We'll use your USDT or USDC first, then ETH or BTC if needed.",
     newSession: {
       flow: 'CASHOUT',
       step: 'AWAITING_AMOUNT',

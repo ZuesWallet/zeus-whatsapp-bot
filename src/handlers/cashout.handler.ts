@@ -237,64 +237,70 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
       return {
         reply:
           '💸 *Cash Out*\n\n' +
-          'How much crypto would you like to cash out?\n\n' +
-          '_Reply with just the amount, e.g. *100* (we\'ll use the asset you have balance in)_\n\n' +
-          '_You can also specify: *100 USDT*, *0.001 BTC*, *1 ETH*_\n\n' +
+          'How much USD would you like to sell?\n\n' +
+          '_Reply with the dollar amount, e.g. *100*_\n\n' +
+          "_We'll use your USDT or USDC first, then ETH or BTC if needed._\n\n" +
           'Type *cancel* to abort.',
         newSession: { flow: 'CASHOUT', step: 'AWAITING_AMOUNT', data: {} },
       }
     }
 
-    // Determine asset: use intent asset as a hint, but always verify balance.
-    // If the hinted asset has zero balance, find the correct variant the user holds.
-    let asset = (intent.type === 'CASHOUT' && intent.asset) || detectAssetFromText(rawInput) || ''
+    const usdAmount = parseFloat(amount)
+
+    // USD-first asset priority: stablecoins first, then volatile assets by USD equivalent
+    const ASSET_PRIORITY = [
+      'USDT_ERC20', 'USDT_TRC20',
+      'USDC_ERC20', 'USDC_BASE',
+      'ETH', 'ETH_BASE',
+      'BTC',
+    ]
 
     let wallets: Awaited<ReturnType<typeof zeuspay.getWallets>> = []
     try {
       wallets = await zeuspay.getWallets(message.from, config.partnerApiKey)
     } catch {
-      // If fetch fails and intent gave us an asset, proceed (will fail at prepare step)
+      // wallet fetch failed — will use fallback below
     }
 
+    let asset = ''
+    let cryptoAmount = ''
+
     if (wallets.length > 0) {
-      const hasEnough = (a: string) => {
-        const w = wallets.find((w) => w.asset === a)
-        return !!w && parseFloat(w.balance) >= parseFloat(amount)
-      }
-
-      if (!asset || !hasEnough(asset)) {
-        // Strip network suffix to find variants of the same base asset
-        const baseAsset = asset.replace(/_ERC20$|_TRC20$|_BASE$/, '')
-        const withBalance = wallets
-          .filter((w) => parseFloat(w.balance) >= parseFloat(amount))
-          .sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance))
-
-        // Prefer same base asset (e.g. user said "USDC", find USDC_BASE)
-        const sameBase = baseAsset
-          ? withBalance.filter((w) => w.asset.replace(/_ERC20$|_TRC20$|_BASE$/, '') === baseAsset)
-          : []
-        const candidates = sameBase.length > 0 ? sameBase : withBalance
-
-        if (candidates.length === 0) {
-          const best = wallets.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance))[0]
-          return {
-            reply:
-              `⚠️ Insufficient balance.\n\n` +
-              (best
-                ? `Your ${best.asset.replace('_ERC20','').replace('_TRC20','').replace('_BASE','')} balance is ${parseFloat(best.balance).toFixed(6)}.`
-                : `You have no funded wallets.`),
-            newSession: { flow: null, step: null, data: {} },
-          }
+      for (const assetKey of ASSET_PRIORITY) {
+        const w = wallets.find((w) => w.asset === assetKey)
+        if (!w) continue
+        const walletUsd = parseFloat(w.usdValue)
+        const walletBal = parseFloat(w.balance)
+        if (walletBal > 0 && walletUsd >= usdAmount) {
+          asset = assetKey
+          // For stablecoins: cryptoAmount ≈ usdAmount. For ETH/BTC: scale by price.
+          cryptoAmount = ((usdAmount / walletUsd) * walletBal).toFixed(8)
+          break
         }
-        asset = candidates[0].asset
       }
-    } else if (!asset) {
-      asset = 'USDT_ERC20' // fallback if wallet fetch failed and no intent asset
+
+      if (!asset) {
+        const best = wallets
+          .filter((w) => ASSET_PRIORITY.includes(w.asset) && parseFloat(w.balance) > 0)
+          .sort((a, b) => parseFloat(b.usdValue) - parseFloat(a.usdValue))[0]
+        return {
+          reply:
+            `⚠️ Insufficient balance for $${usdAmount.toFixed(2)} USD.\n\n` +
+            (best
+              ? `Your highest balance is ${best.asset.replace('_ERC20', '').replace('_TRC20', '').replace('_BASE', '')} worth $${parseFloat(best.usdValue).toFixed(2)}.`
+              : `You have no funded wallets.`),
+          newSession: { flow: null, step: null, data: {} },
+        }
+      }
+    } else {
+      // Wallet fetch failed — default to USDT, pass USD amount directly (1:1)
+      asset = 'USDT_ERC20'
+      cryptoAmount = usdAmount.toFixed(8)
     }
 
     let estimate: ZeusPayEstimate
     try {
-      estimate = await zeuspay.getEstimate(asset, amount, config.partnerApiKey)
+      estimate = await zeuspay.getEstimate(asset, cryptoAmount, config.partnerApiKey)
     } catch (err: any) {
       console.error('[cashout] getEstimate failed', {
         asset,
@@ -320,7 +326,7 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
     const assetDisplay = asset.replace('_ERC20', '').replace('_TRC20', '').replace('_BASE', '')
 
     let reply = `📤 *Cashout Preview*\n\n`
-    reply += `Selling: ${amount} ${assetDisplay}\n`
+    reply += `Selling: $${usdAmount.toFixed(2)} USD (${parseFloat(cryptoAmount).toFixed(6)} ${assetDisplay})\n`
     reply += `Rate: 1 ${assetDisplay} = ₦${parseFloat(estimate.rateUsed).toLocaleString()}\n`
     reply += `Fee: ₦${parseFloat(estimate.feeAmountNgn).toLocaleString()}\n`
     reply += `*You receive: ₦${parseFloat(estimate.ngnAmount).toLocaleString()}*\n\n`
@@ -338,7 +344,7 @@ export async function cashoutHandler(input: HandlerInput): Promise<HandlerOutput
 
     return {
       reply,
-      newSession: { flow: 'CASHOUT', step: 'AWAITING_BANK', data: { asset, amount, estimate } },
+      newSession: { flow: 'CASHOUT', step: 'AWAITING_BANK', data: { asset, amount: cryptoAmount, usdAmount, estimate } },
     }
   }
 

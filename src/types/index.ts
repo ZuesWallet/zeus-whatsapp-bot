@@ -50,6 +50,7 @@ export interface Session {
   data: {
     asset?: string
     amount?: string
+    usdAmount?: number
     bankCode?: string
     bankName?: string
     accountNumber?: string

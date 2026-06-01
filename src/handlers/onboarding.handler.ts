@@ -28,8 +28,14 @@ export async function handleOnboarding(
   let profile: Awaited<ReturnType<typeof zeuspay.getUserProfile>>
   try {
     profile = await zeuspay.getUserProfile(message.from, config.partnerApiKey)
-  } catch {
-    return null
+  } catch (err) {
+    console.error('[onboarding] getUserProfile failed — cannot onboard user', err)
+    return {
+      reply:
+        "⚠️ We're having trouble setting up your account right now.\n\n" +
+        'Please try again in a moment.',
+      newSession: { flow: null, step: null, data: {} },
+    }
   }
 
   const displayName = message.contactName || profile.fullName || message.from

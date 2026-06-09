@@ -49,7 +49,7 @@ export async function addBankHandler(input: HandlerInput): Promise<HandlerOutput
         to: message.from,
         phoneNumberId: config.metaCredentials.phoneNumberId,
         accessToken: config.metaCredentials.accessToken,
-        flowId: process.env.META_ADD_BANK_FLOW_ID!,
+        flowId: config.metaCredentials?.addBankFlowId ?? process.env.META_ADD_BANK_FLOW_ID ?? '',
         flowCta: 'Add Bank Account',
         screenId: 'ADD_BANK_DETAILS',
         flowData: { banks: bankRows, error_message: '', has_error: false },

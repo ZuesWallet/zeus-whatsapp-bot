@@ -67,12 +67,23 @@ export class RoutingService {
       const creds = decryptCredentials(data.config.bspCredentials)
 
       if (bspType === 'META_CLOUD') {
-        // Credentials stored as MetaCloudCredentials: { accessToken, phoneNumberId, wabaId }
-        const meta = creds as { accessToken?: string; phoneNumberId?: string; wabaId?: string }
+        const meta = creds as {
+          accessToken?: string
+          phoneNumberId?: string
+          wabaId?: string
+          appSecret?: string
+          cashoutFlowId?: string
+          setPinFlowId?: string
+          addBankFlowId?: string
+        }
         metaCredentials = {
-          accessToken: meta.accessToken || process.env.META_ACCESS_TOKEN || '',
-          phoneNumberId: meta.phoneNumberId || process.env.META_PHONE_NUMBER_ID || '',
-          wabaId: meta.wabaId || process.env.META_WABA_ID || '',
+          accessToken:    meta.accessToken    || process.env.META_ACCESS_TOKEN    || '',
+          phoneNumberId:  meta.phoneNumberId  || process.env.META_PHONE_NUMBER_ID || '',
+          wabaId:         meta.wabaId         || process.env.META_WABA_ID         || '',
+          appSecret:      meta.appSecret      || process.env.META_APP_SECRET,
+          cashoutFlowId:  meta.cashoutFlowId  || process.env.META_FLOW_ID,
+          setPinFlowId:   meta.setPinFlowId   || process.env.META_SET_PIN_FLOW_ID,
+          addBankFlowId:  meta.addBankFlowId  || process.env.META_ADD_BANK_FLOW_ID,
         }
         // Twilio fields not used for Meta — fill with empty strings to satisfy the type
         twilioCredentials = { accountSid: '', authToken: '', messagingServiceSid: '' }

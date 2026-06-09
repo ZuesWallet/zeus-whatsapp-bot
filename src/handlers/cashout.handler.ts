@@ -139,7 +139,7 @@ async function openCashoutFlow(params: {
         to: message.from,
         phoneNumberId: config.metaCredentials.phoneNumberId,
         accessToken: config.metaCredentials.accessToken,
-        flowId: process.env.META_FLOW_ID!,
+        flowId: config.metaCredentials?.cashoutFlowId ?? process.env.META_FLOW_ID ?? '',
         flowCta: 'Confirm Cashout',
         screenId: 'CONFIRM_CASHOUT',
         flowData,

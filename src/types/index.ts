@@ -40,6 +40,10 @@ export interface PartnerConfig {
     accessToken: string
     phoneNumberId: string  // Meta's internal phone number ID
     wabaId: string
+    appSecret?: string
+    cashoutFlowId?: string
+    setPinFlowId?: string
+    addBankFlowId?: string
   }
 }
 

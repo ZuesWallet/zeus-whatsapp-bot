@@ -75,7 +75,7 @@ export async function handleOnboarding(
           to: message.from,
           phoneNumberId: config.metaCredentials.phoneNumberId,
           accessToken: config.metaCredentials.accessToken,
-          flowId: process.env.META_SET_PIN_FLOW_ID!,
+          flowId: config.metaCredentials?.setPinFlowId ?? process.env.META_SET_PIN_FLOW_ID ?? '',
           flowCta: 'Set Up PIN',
           screenId: 'SET_PIN',
           flowData: { user_name: firstName },

@@ -7,7 +7,7 @@ import { dispatch } from '../handlers'
 import { sendHelpGuide } from '../handlers/onboarding.handler'
 import { getRedisClient } from '../lib/redis'
 import { metaService } from '../services/meta.service'
-import type { InboundMessage, Session, PartnerConfig } from '../types'
+import type { InboundMessage, Session, PartnerConfig, HandlerOutput } from '../types'
 
 const router = Router()
 const routing = new RoutingService()
@@ -262,7 +262,7 @@ async function dispatchAndReply(
   from: string,
   phoneNumberId: string
 ): Promise<void> {
-  const output = await dispatch(inbound, session, config)
+  const output: HandlerOutput = await dispatch(inbound, session, config)
 
   if (output.newSession !== undefined) {
     if (output.newSession === null || (!output.newSession.flow && !output.newSession.step)) {
@@ -317,3 +317,4 @@ interface MetaMessage {
 }
 
 export default router
+ 

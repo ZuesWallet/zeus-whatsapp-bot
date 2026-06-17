@@ -102,6 +102,7 @@ export interface HandlerInput {
 // Handler output
 export interface HandlerOutput {
   reply: string
+  replies?: string[]  // additional messages sent after `reply`
   newSession?: Session | null
 }
 

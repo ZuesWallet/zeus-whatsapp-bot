@@ -277,6 +277,9 @@ async function dispatchAndReply(
   if (output.reply) {
     await sendMessage(from, output.reply, config)
   }
+  for (const extra of output.replies ?? []) {
+    await sendMessage(from, extra, config)
+  }
 }
 
 interface MetaWebhookPayload {

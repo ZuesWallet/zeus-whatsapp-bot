@@ -19,12 +19,14 @@ export async function walletHandler(input: HandlerInput): Promise<HandlerOutput>
   await zeuspay.getOrCreateUser(message.from, config.partnerApiKey)
   const wallets = await zeuspay.getWallets(message.from, config.partnerApiKey)
 
-  let reply = '📥 *Deposit Addresses*\n\n'
-  for (const w of wallets) {
-    const label = ASSET_LABELS[w.asset] || w.asset
-    reply += `*${label}*\n\`${w.address}\`\n\n`
-  }
-  reply += '⚠️ _Only send the matching asset to each address._'
+  const header = '📥 *Deposit Addresses*\n_Tap and hold on an address below, then tap *Copy* to copy it._'
 
-  return { reply, newSession: { flow: null, step: null, data: {} } }
+  const replies = wallets.map((w) => {
+    const label = ASSET_LABELS[w.asset] || w.asset
+    return `*${label}*\n${w.address}`
+  })
+
+  replies.push('⚠️ _Only send the matching asset to each address._')
+
+  return { reply: header, replies, newSession: { flow: null, step: null, data: {} } }
 }

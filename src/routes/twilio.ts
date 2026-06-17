@@ -96,6 +96,9 @@ router.post('/', async (req: Request, res: Response) => {
       if (output.reply) {
         await sendMessage(from, output.reply, config)
       }
+      for (const extra of output.replies ?? []) {
+        await sendMessage(from, extra, config)
+      }
     } catch (err) {
       console.error('[WhatsApp] Unhandled error processing message:', err)
     }

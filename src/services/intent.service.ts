@@ -93,6 +93,18 @@ export class IntentService {
       return { type: 'HISTORY' }
     }
 
+    // ── Pay bill ──────────────────────────────────────────────────────────
+    if (
+      t === 'paybill' ||
+      t.includes('pay bill') ||
+      t.includes('light bill') ||
+      t.includes('electricity') ||
+      t.includes('buy light') ||
+      t === 'paybills'
+    ) {
+      return { type: 'PAY_BILL' }
+    }
+
     // ── Add bank ──────────────────────────────────────────────────────────
     if (
       t === 'addbank' ||

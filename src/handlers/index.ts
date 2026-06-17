@@ -10,6 +10,7 @@ import { addBankHandler } from './addBank.handler'
 import { setPinHandler, changePinHandler, forgotPinHandler } from './setPin.handler'
 import { handleOnboarding } from './onboarding.handler'
 import { withdrawHandler } from './withdraw.handler'
+import { paybillHandler } from './paybill.handler'
 import type { InboundMessage, Session, PartnerConfig, HandlerOutput, WACommand } from '../types'
 
 const intentSvc = new IntentService()
@@ -60,6 +61,10 @@ export async function dispatch(
     return withdrawHandler(input)
   }
 
+  if (session.flow === 'PAY_BILL') {
+    return paybillHandler(input)
+  }
+
   if (session.flow === 'ONBOARDING_PIN') {
     if (intent.type === 'CANCEL') {
       return {
@@ -86,6 +91,7 @@ export async function dispatch(
     FORGOT_PIN: 'SET_PIN',
     HELP:       'HELP',
     ONBOARDING: 'HELP',
+    PAY_BILL:   'PAYBILL',
   }
 
   const requiredFeature = commandToFeature[intent.type]
@@ -111,6 +117,7 @@ export async function dispatch(
     case 'SET_PIN':     return setPinHandler(input)
     case 'CHANGE_PIN':  return changePinHandler(input)
     case 'FORGOT_PIN':  return forgotPinHandler(input)
+    case 'PAY_BILL':    return paybillHandler(input)
     case 'HELP':
     case 'MENU_SELECT': return helpHandler(input)
     case 'CANCEL':

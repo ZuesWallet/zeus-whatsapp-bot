@@ -7,6 +7,7 @@ export type WACommand =
   | 'HELP'
   | 'ADD_BANK'
   | 'SET_PIN'
+  | 'PAYBILL'
 
 // Raw inbound message — normalised from Twilio's format
 export interface InboundMessage {
@@ -44,12 +45,13 @@ export interface PartnerConfig {
     cashoutFlowId?: string
     setPinFlowId?: string
     addBankFlowId?: string
+    paybillFlowId?: string
   }
 }
 
 // Redis session state
 export interface Session {
-  flow: 'CASHOUT' | 'ADD_BANK' | 'SET_PIN' | 'CHANGE_PIN' | 'FORGOT_PIN' | 'WITHDRAW' | 'ONBOARDING_PIN' | null
+  flow: 'CASHOUT' | 'ADD_BANK' | 'SET_PIN' | 'CHANGE_PIN' | 'FORGOT_PIN' | 'WITHDRAW' | 'ONBOARDING_PIN' | 'PAY_BILL' | null
   step: string | null
   data: {
     asset?: string
@@ -71,6 +73,10 @@ export interface Session {
     pin?: string
     currentPin?: string
     newPin?: string
+    billerCode?: string
+    billerName?: string
+    itemCode?: string
+    billers?: ZeusPayBiller[]
   }
 }
 
@@ -87,6 +93,7 @@ export type Intent =
   | { type: 'CHANGE_PIN' }
   | { type: 'FORGOT_PIN' }
   | { type: 'HELP' }
+  | { type: 'PAY_BILL' }
   | { type: 'CANCEL' }
   | { type: 'MENU_SELECT'; option: string }
   | { type: 'PIN_ENTRY'; pin: string }
@@ -170,4 +177,18 @@ export interface PreparedCashout {
   accountName: string
   accountLast4: string
   expiresAt: string
+}
+
+export interface ZeusPayBiller {
+  billerCode: string
+  name: string
+  billerId: number
+}
+
+export interface ZeusPayPrepaidItem {
+  itemCode: string
+  billerCode: string
+  name: string
+  amount: number | null
+  fee: number
 }

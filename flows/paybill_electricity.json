@@ -1,0 +1,153 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "ENTER_METER": ["CONFIRM_AMOUNT"],
+    "CONFIRM_AMOUNT": ["CONFIRM_PAYMENT"],
+    "CONFIRM_PAYMENT": ["SUCCESS"],
+    "SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "ENTER_METER",
+      "title": "Enter Meter Number",
+      "data": {
+        "biller_name": { "type": "string", "__example__": "Ikeja Electric" },
+        "error_message": { "type": "string", "__example__": "" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Pay ${data.biller_name}" },
+          { "type": "TextBody", "text": "Enter your prepaid meter number." },
+          {
+            "type": "TextInput",
+            "label": "Meter Number",
+            "name": "meter_number",
+            "input-type": "number",
+            "required": true,
+            "min-chars": 10,
+            "max-chars": 13,
+            "error-message": "${data.error_message}"
+          },
+          {
+            "type": "Footer",
+            "label": "Validate",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": { "meter_number": "${form.meter_number}" }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CONFIRM_AMOUNT",
+      "title": "Confirm Meter",
+      "data": {
+        "biller_name": { "type": "string", "__example__": "Ikeja Electric" },
+        "meter_number": { "type": "string", "__example__": "04123456789" },
+        "customer_name": { "type": "string", "__example__": "JOHN DOE" },
+        "error_message": { "type": "string", "__example__": "" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Meter Verified" },
+          { "type": "TextBody", "text": "${data.customer_name}\n${data.biller_name} — ${data.meter_number}" },
+          { "type": "TextSubheading", "text": "How much would you like to pay?" },
+          {
+            "type": "TextInput",
+            "label": "Amount (NGN)",
+            "name": "amount_ngn",
+            "input-type": "number",
+            "required": true,
+            "helper-text": "Min ₦100, Max ₦500,000",
+            "error-message": "${data.error_message}"
+          },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": { "amount_ngn": "${form.amount_ngn}" }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CONFIRM_PAYMENT",
+      "title": "Confirm Payment",
+      "data": {
+        "biller_name": { "type": "string", "__example__": "Ikeja Electric" },
+        "meter_number": { "type": "string", "__example__": "04123456789" },
+        "customer_name": { "type": "string", "__example__": "JOHN DOE" },
+        "amount_ngn": { "type": "string", "__example__": "5,000" },
+        "crypto_required": { "type": "string", "__example__": "3.75" },
+        "asset": { "type": "string", "__example__": "USDT" },
+        "fee_ngn": { "type": "string", "__example__": "75" },
+        "rate_used": { "type": "string", "__example__": "1,350" },
+        "transaction_id": { "type": "string", "__example__": "txn_abc" },
+        "error_message": { "type": "string", "__example__": "" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Confirm Payment" },
+          { "type": "TextBody", "text": "${data.biller_name} — ${data.meter_number}\n${data.customer_name}" },
+          { "type": "TextBody", "text": "Amount: ₦${data.amount_ngn}" },
+          { "type": "TextBody", "text": "You pay: ${data.crypto_required} ${data.asset}  •  Fee: ₦${data.fee_ngn}" },
+          { "type": "TextBody", "text": "Rate: 1 ${data.asset} = ₦${data.rate_used}" },
+          {
+            "type": "TextInput",
+            "label": "Transaction PIN",
+            "name": "pin",
+            "input-type": "password",
+            "required": true,
+            "min-chars": 6,
+            "max-chars": 6,
+            "helper-text": "Enter your 6-digit PIN to confirm",
+            "error-message": "${data.error_message}"
+          },
+          {
+            "type": "Footer",
+            "label": "Pay Now",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "pin": "${form.pin}",
+                "transaction_id": "${data.transaction_id}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Payment Complete",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "token": { "type": "string", "__example__": "1234-5678-9012-3456" },
+        "amount_ngn": { "type": "string", "__example__": "5,000" },
+        "meter_number": { "type": "string", "__example__": "04123456789" },
+        "has_token": { "type": "string", "__example__": "true" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Payment Successful" },
+          { "type": "TextBody", "text": "₦${data.amount_ngn} sent to meter ${data.meter_number}." },
+          { "type": "TextBody", "text": "Your token: ${data.token}" },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": { "name": "complete", "payload": { "status": "success" } }
+          }
+        ]
+      }
+    }
+  ]
+}

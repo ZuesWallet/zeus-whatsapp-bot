@@ -8,6 +8,7 @@ const commandMap: Record<WACommand, string> = {
   HISTORY:  '🕐 *history* — Your last 5 transactions',
   ADD_BANK: '🏦 *add bank* — Add a bank account',
   SET_PIN:  '🔐 *set pin* — Set your transaction PIN',
+  PAYBILL:  '⚡ *pay bill* — Pay your electricity bill',
   HELP:     '',
 }
 

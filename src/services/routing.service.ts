@@ -75,6 +75,7 @@ export class RoutingService {
           cashoutFlowId?: string
           setPinFlowId?: string
           addBankFlowId?: string
+          paybillFlowId?: string
         }
         metaCredentials = {
           accessToken:    meta.accessToken    || process.env.META_ACCESS_TOKEN    || '',
@@ -84,6 +85,7 @@ export class RoutingService {
           cashoutFlowId:  meta.cashoutFlowId  || process.env.META_FLOW_ID,
           setPinFlowId:   meta.setPinFlowId   || process.env.META_SET_PIN_FLOW_ID,
           addBankFlowId:  meta.addBankFlowId  || process.env.META_ADD_BANK_FLOW_ID,
+          paybillFlowId:  meta.paybillFlowId  || process.env.META_PAYBILL_FLOW_ID,
         }
         // Twilio fields not used for Meta — fill with empty strings to satisfy the type
         twilioCredentials = { accountSid: '', authToken: '', messagingServiceSid: '' }

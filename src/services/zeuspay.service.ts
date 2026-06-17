@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios'
 import type {
   ZeusPayUser, ZeusPayWallet, ZeusPayRate, ZeusPayEstimate,
   ZeusPayTransaction, ZeusPayBankAccount, PreparedCashout,
+  ZeusPayBiller, ZeusPayPrepaidItem,
 } from '../types'
 
 class ZeusPayError extends Error {
@@ -263,6 +264,22 @@ export class ZeusPayService {
     return this.withRetry(async () => {
       const res = await this.client(apiKey).get('/api/v1/partner/bank-accounts/banks')
       return res.data.data as { code: string; name: string }[]
+    })
+  }
+
+  async getElectricityBillers(apiKey: string): Promise<ZeusPayBiller[]> {
+    return this.withRetry(async () => {
+      const res = await this.client(apiKey).get('/api/v1/partner/billers/electricity')
+      return res.data.data as ZeusPayBiller[]
+    })
+  }
+
+  async getPrepaidItem(billerCode: string, apiKey: string): Promise<ZeusPayPrepaidItem> {
+    return this.withRetry(async () => {
+      const res = await this.client(apiKey).get(
+        `/api/v1/partner/billers/${billerCode}/prepaid-item`
+      )
+      return res.data.data as ZeusPayPrepaidItem
     })
   }
 

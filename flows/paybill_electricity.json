@@ -12,13 +12,13 @@
       "id": "ENTER_METER",
       "title": "Enter Meter Number",
       "data": {
-        "biller_name": { "type": "string", "__example__": "Ikeja Electric" },
+        "heading_text": { "type": "string", "__example__": "Pay Ikeja Electric" },
         "error_message": { "type": "string", "__example__": "" }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Pay ${data.biller_name}" },
+          { "type": "TextHeading", "text": "${data.heading_text}" },
           { "type": "TextBody", "text": "Enter your prepaid meter number." },
           {
             "type": "TextInput",
@@ -45,16 +45,14 @@
       "id": "CONFIRM_AMOUNT",
       "title": "Confirm Meter",
       "data": {
-        "biller_name": { "type": "string", "__example__": "Ikeja Electric" },
-        "meter_number": { "type": "string", "__example__": "04123456789" },
-        "customer_name": { "type": "string", "__example__": "JOHN DOE" },
+        "verification_text": { "type": "string", "__example__": "JOHN DOE\nIkeja Electric — 04123456789" },
         "error_message": { "type": "string", "__example__": "" }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           { "type": "TextHeading", "text": "Meter Verified" },
-          { "type": "TextBody", "text": "${data.customer_name}\n${data.biller_name} — ${data.meter_number}" },
+          { "type": "TextBody", "text": "${data.verification_text}" },
           { "type": "TextSubheading", "text": "How much would you like to pay?" },
           {
             "type": "TextInput",
@@ -80,14 +78,10 @@
       "id": "CONFIRM_PAYMENT",
       "title": "Confirm Payment",
       "data": {
-        "biller_name": { "type": "string", "__example__": "Ikeja Electric" },
-        "meter_number": { "type": "string", "__example__": "04123456789" },
-        "customer_name": { "type": "string", "__example__": "JOHN DOE" },
-        "amount_ngn": { "type": "string", "__example__": "5,000" },
-        "crypto_required": { "type": "string", "__example__": "3.75" },
-        "asset": { "type": "string", "__example__": "USDT" },
-        "fee_ngn": { "type": "string", "__example__": "75" },
-        "rate_used": { "type": "string", "__example__": "1,350" },
+        "summary_text": { "type": "string", "__example__": "Ikeja Electric — 04123456789\nJOHN DOE" },
+        "amount_text": { "type": "string", "__example__": "Amount: ₦5,000" },
+        "payment_text": { "type": "string", "__example__": "You pay: 3.75 USDT  •  Fee: ₦75" },
+        "rate_text": { "type": "string", "__example__": "Rate: 1 USDT = ₦1,350" },
         "transaction_id": { "type": "string", "__example__": "txn_abc" },
         "error_message": { "type": "string", "__example__": "" }
       },
@@ -95,10 +89,10 @@
         "type": "SingleColumnLayout",
         "children": [
           { "type": "TextHeading", "text": "Confirm Payment" },
-          { "type": "TextBody", "text": "${data.biller_name} — ${data.meter_number}\n${data.customer_name}" },
-          { "type": "TextBody", "text": "Amount: ₦${data.amount_ngn}" },
-          { "type": "TextBody", "text": "You pay: ${data.crypto_required} ${data.asset}  •  Fee: ₦${data.fee_ngn}" },
-          { "type": "TextBody", "text": "Rate: 1 ${data.asset} = ₦${data.rate_used}" },
+          { "type": "TextBody", "text": "${data.summary_text}" },
+          { "type": "TextBody", "text": "${data.amount_text}" },
+          { "type": "TextBody", "text": "${data.payment_text}" },
+          { "type": "TextBody", "text": "${data.rate_text}" },
           {
             "type": "TextInput",
             "label": "Transaction PIN",
@@ -130,17 +124,15 @@
       "terminal": true,
       "success": true,
       "data": {
-        "token": { "type": "string", "__example__": "1234-5678-9012-3456" },
-        "amount_ngn": { "type": "string", "__example__": "5,000" },
-        "meter_number": { "type": "string", "__example__": "04123456789" },
-        "has_token": { "type": "string", "__example__": "true" }
+        "success_text": { "type": "string", "__example__": "₦5,000 sent to meter 04123456789." },
+        "token_text": { "type": "string", "__example__": "Your token: 1234-5678-9012-3456" }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           { "type": "TextHeading", "text": "Payment Successful" },
-          { "type": "TextBody", "text": "₦${data.amount_ngn} sent to meter ${data.meter_number}." },
-          { "type": "TextBody", "text": "Your token: ${data.token}" },
+          { "type": "TextBody", "text": "${data.success_text}" },
+          { "type": "TextBody", "text": "${data.token_text}" },
           {
             "type": "Footer",
             "label": "Done",

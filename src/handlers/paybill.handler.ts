@@ -241,7 +241,7 @@ async function openPayBillFlow(input: HandlerInput): Promise<HandlerOutput> {
     flowId: config.metaCredentials.paybillFlowId ?? process.env.META_PAYBILL_FLOW_ID ?? '',
     flowCta: 'Pay Bill',
     screenId: 'ENTER_METER',
-    flowData: { biller_name: billerName!, error_message: '' },
+    flowData: { heading_text: `Pay ${billerName}`, error_message: '' },
     flowToken,
   })
 
